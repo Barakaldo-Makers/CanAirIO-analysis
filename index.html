@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aire · monitor CanAirIO por zonas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    /* paleta "instrumento atmosférico": claro, frío, con estados semánticos */
+    --bg:#eef2f4; --panel:#ffffff; --ink:#16242b; --muted:#5a6b73;
+    --line:#d3dce0; --accent:#0d6e8c;
+    --ok:#2e8b57; --ok-bg:#e3f3e9;
+    --warn:#c98a12; --warn-bg:#fbf0d8;
+    --crit:#c0392b; --crit-bg:#f9e2de;
+    --shadow:0 1px 2px rgba(20,40,50,.06),0 4px 16px rgba(20,40,50,.05);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Space Grotesk",system-ui,sans-serif;line-height:1.5;
+    background-image:radial-gradient(1200px 400px at 80% -10%,rgba(13,110,140,.07),transparent);}
+  .wrap{max-width:1040px;margin:0 auto;padding:28px 20px 60px}
+  header{display:flex;align-items:baseline;justify-content:space-between;
+    flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--line);padding-bottom:18px}
+  h1{font-size:1.55rem;font-weight:700;margin:0;letter-spacing:-.01em}
+  h1 .dot{color:var(--accent)}
+  .sub{color:var(--muted);font-size:.9rem}
+  .updated{font-family:"JetBrains Mono",monospace;font-size:.78rem;color:var(--muted)}
+  section{margin-top:34px}
+  .eyebrow{font-family:"JetBrains Mono",monospace;font-size:.72rem;
+    text-transform:uppercase;letter-spacing:.14em;color:var(--muted);margin:0 0 14px}
+  /* tarjetas de estado por zona */
+  .zones{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:18px 18px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
+  .card.ok::before{background:var(--ok)} .card.warning::before{background:var(--warn)}
+  .card.critical::before{background:var(--crit)}
+  .card .zone{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:1.05rem}
+  .badge{display:inline-block;font-family:"JetBrains Mono",monospace;font-size:.7rem;
+    text-transform:uppercase;letter-spacing:.08em;padding:3px 9px;border-radius:999px;font-weight:700}
+  .badge.ok{background:var(--ok-bg);color:var(--ok)}
+  .badge.warning{background:var(--warn-bg);color:var(--warn)}
+  .badge.critical{background:var(--crit-bg);color:var(--crit)}
+  .row{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+  .metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 16px;margin:14px 0 4px}
+  .metric{display:flex;flex-direction:column}
+  .metric .k{font-size:.72rem;color:var(--muted)}
+  .metric .v{font-family:"JetBrains Mono",monospace;font-weight:500;font-size:1.05rem}
+  .aqi{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:2rem;line-height:1}
+  .note{font-size:.85rem;color:var(--muted);margin-top:10px}
+  .alerts{margin-top:8px;font-size:.85rem;color:var(--crit)}
+  /* gráficas */
+  .charts{display:grid;gap:18px;grid-template-columns:1fr 1fr}
+  @media(max-width:720px){.charts{grid-template-columns:1fr}}
+  .chartbox{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:16px;box-shadow:var(--shadow)}
+  .chartbox h3{margin:0 0 4px;font-size:.95rem}
+  .chartbox .cap{font-size:.78rem;color:var(--muted);margin:0 0 12px}
+  canvas{width:100%!important;height:230px!important}
+  /* timeline */
+  .timeline{position:relative;margin-top:6px;padding-left:18px}
+  .timeline::before{content:"";position:absolute;left:4px;top:4px;bottom:4px;width:2px;background:var(--line)}
+  .ev{position:relative;padding:0 0 16px 16px}
+  .ev::before{content:"";position:absolute;left:-18px;top:5px;width:9px;height:9px;border-radius:50%;
+    background:var(--panel);border:2px solid var(--muted)}
+  .ev.ok::before{border-color:var(--ok)} .ev.warning::before{border-color:var(--warn)}
+  .ev.critical::before{border-color:var(--crit)}
+  .ev time{font-family:"JetBrains Mono",monospace;font-size:.74rem;color:var(--muted)}
+  .ev .txt{font-size:.9rem;margin-top:1px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .controls button{font-family:"JetBrains Mono",monospace;font-size:.78rem;
+    border:1px solid var(--line);background:var(--panel);color:var(--muted);
+    padding:6px 12px;border-radius:999px;cursor:pointer}
+  .controls button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  footer{margin-top:50px;border-top:1px solid var(--line);padding-top:16px;
+    font-size:.8rem;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  a{color:var(--accent)}
+  .empty{color:var(--muted);font-size:.9rem;padding:20px;text-align:center;
+    border:1px dashed var(--line);border-radius:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Aire<span class="dot">.</span></h1>
+      <div class="sub">Calidad del aire por zonas · datos comunitarios CanAirIO + meteo Open-Meteo</div>
+    </div>
+    <div class="updated" id="updated">cargando…</div>
+  </header>
+
+  <section>
+    <p class="eyebrow">Estado actual por zona</p>
+    <div class="zones" id="zones"><div class="empty">Cargando datos…</div></div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Evolución</p>
+    <div class="controls" id="zonePicker"></div>
+    <div class="charts">
+      <div class="chartbox">
+        <h3>Índice de calidad del aire (AQI)</h3>
+        <p class="cap">Menor es mejor · escala tipo EPA sobre PM2.5</p>
+        <canvas id="aqiChart"></canvas>
+      </div>
+      <div class="chartbox">
+        <h3>PM2.5 y ruido</h3>
+        <p class="cap">Partículas finas (µg/m³) y nivel sonoro (dB)</p>
+        <canvas id="pmChart"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Cambios de estado recientes</p>
+    <div class="timeline" id="timeline"><div class="empty">—</div></div>
+  </section>
+
+  <footer>
+    <span>Generado automáticamente desde sensores comunitarios. No es una fuente oficial.</span>
+    <span id="meta"></span>
+  </footer>
+</div>
+
+<script>
+const ST = {ok:"ok", warning:"atención", critical:"crítico"};
+const COL = {ok:"#2e8b57", warning:"#c98a12", critical:"#c0392b"};
+let HISTORY = null, ACTIVE = null, charts = {};
+
+function fmtTime(iso){
+  try{ return new Date(iso).toLocaleString("es-ES",{day:"2-digit",month:"short",
+    hour:"2-digit",minute:"2-digit"}); }catch(e){ return iso; }
+}
+
+async function load(){
+  // estado e historico se cargan por separado: si uno falla, el otro se muestra
+  let sOk = false;
+  try{
+    const s = await fetch("data/state.json",{cache:"no-store"}).then(r=>{
+      if(!r.ok) throw new Error("HTTP "+r.status); return r.json();});
+    renderState(s);
+    buildPicker((s.zones||[]).map(z=>z.geo3));
+    sOk = true;
+  }catch(e){
+    document.getElementById("zones").innerHTML =
+      '<div class="empty">No hay datos publicados todavía. Vuelve tras el primer ciclo de análisis.</div>';
+    document.getElementById("updated").textContent = "sin datos";
+  }
+  try{
+    const h = await fetch("data/history.json",{cache:"no-store"}).then(r=>{
+      if(!r.ok) throw new Error("HTTP "+r.status); return r.json();});
+    HISTORY = h;
+    renderTimeline(h);
+    if(sOk) drawCharts();
+  }catch(e){
+    document.getElementById("timeline").innerHTML =
+      '<div class="empty">Histórico aún no disponible.</div>';
+  }
+}
+
+function renderState(s){
+  document.getElementById("updated").textContent = "actualizado " + fmtTime(s.generated_at);
+  if(s.meta && s.meta.source)
+    document.getElementById("meta").textContent = "fuente: " + s.meta.source;
+  const host = document.getElementById("zones");
+  if(!s.zones || !s.zones.length){ host.innerHTML='<div class="empty">Sin zonas activas.</div>'; return; }
+  host.innerHTML = s.zones.map(z=>{
+    const st = z.status in ST ? z.status : "ok";
+    const m = (k,u)=> (z[k]==null?"—":(Math.round(z[k]*10)/10)+(u||""));
+    return `<div class="card ${st}">
+      <div class="row"><span class="zone">${z.geo3}</span>
+        <span class="badge ${st}">${ST[st]||st}</span></div>
+      <div class="row" style="margin-top:12px;align-items:flex-end">
+        <div><div class="metric"><span class="k">AQI</span>
+          <span class="aqi" style="color:${COL[st]}">${z.aqi??"—"}</span></div></div>
+        <div class="metrics" style="margin:0;flex:1;margin-left:18px">
+          <div class="metric"><span class="k">PM2.5</span><span class="v">${m("pm25"," µg")}</span></div>
+          <div class="metric"><span class="k">Ruido</span><span class="v">${m("noise_db"," dB")}</span></div>
+          <div class="metric"><span class="k">NO₂</span><span class="v">${m("no2"," µg")}</span></div>
+          <div class="metric"><span class="k">Viento</span><span class="v">${m("wind_kmh"," km/h")}</span></div>
+        </div></div>
+      ${z.alerts?`<div class="alerts">⚠ ${z.alerts}</div>`:""}
+      ${z.prediction?`<div class="note">${z.prediction}</div>`:""}
+    </div>`;
+  }).join("");
+}
+
+function buildPicker(zones){
+  const host = document.getElementById("zonePicker");
+  const uniq = [...new Set(zones)];
+  ACTIVE = uniq[0] || null;
+  host.innerHTML = uniq.map(z=>`<button data-z="${z}" class="${z===ACTIVE?'active':''}">${z}</button>`).join("");
+  host.querySelectorAll("button").forEach(b=>b.onclick=()=>{
+    ACTIVE=b.dataset.z;
+    host.querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));
+    drawCharts();
+  });
+  drawCharts();
+}
+
+function seriesFor(z){
+  const pts = (HISTORY?.points||[]).filter(p=>p.geo3===z)
+    .sort((a,b)=>new Date(a.t)-new Date(b.t));
+  return pts;
+}
+
+function drawCharts(){
+  if(!ACTIVE) return;
+  const pts = seriesFor(ACTIVE);
+  const labels = pts.map(p=>fmtTime(p.t));
+  const baseOpts = {responsive:true,maintainAspectRatio:false,
+    interaction:{intersect:false,mode:"index"},
+    scales:{x:{ticks:{maxTicksLimit:6,font:{family:"JetBrains Mono",size:10}},grid:{display:false}},
+            y:{beginAtZero:true,ticks:{font:{family:"JetBrains Mono",size:10}},grid:{color:"#e6edf0"}}},
+    plugins:{legend:{labels:{font:{family:"Space Grotesk",size:11},usePointStyle:true}}}};
+  // AQI
+  charts.aqi && charts.aqi.destroy();
+  charts.aqi = new Chart(document.getElementById("aqiChart"),{type:"line",
+    data:{labels,datasets:[{label:"AQI",data:pts.map(p=>p.aqi),
+      borderColor:"#0d6e8c",backgroundColor:"rgba(13,110,140,.12)",fill:true,
+      tension:.3,pointRadius:0,borderWidth:2}]},options:baseOpts});
+  // PM2.5 + ruido (doble eje)
+  const opt2 = JSON.parse(JSON.stringify(baseOpts));
+  opt2.scales.y1 = {position:"right",beginAtZero:true,grid:{display:false},
+    ticks:{font:{family:"JetBrains Mono",size:10}}};
+  charts.pm && charts.pm.destroy();
+  charts.pm = new Chart(document.getElementById("pmChart"),{type:"line",
+    data:{labels,datasets:[
+      {label:"PM2.5 µg/m³",data:pts.map(p=>p.pm25),borderColor:"#c0392b",
+        backgroundColor:"rgba(192,57,43,.10)",fill:true,tension:.3,pointRadius:0,borderWidth:2,yAxisID:"y"},
+      {label:"Ruido dB",data:pts.map(p=>p.noise_db),borderColor:"#c98a12",
+        tension:.3,pointRadius:0,borderWidth:2,yAxisID:"y1"}]},options:opt2});
+}
+
+function renderTimeline(h){
+  const host = document.getElementById("timeline");
+  const pts = (h?.points||[]).filter(p=>p.status!=null)
+    .sort((a,b)=>new Date(b.t)-new Date(a.t));
+  // detecta transiciones de estado por zona
+  const seen = {}, events = [];
+  for(const p of pts){
+    const st = p.status>=2?"critical":p.status>=1?"warning":"ok";
+    if(seen[p.geo3] && seen[p.geo3]!==st){
+      events.push({t:p.t,geo3:p.geo3,from:seen[p.geo3],to:st});
+    }
+    seen[p.geo3]=st;
+  }
+  if(!events.length){ host.innerHTML='<div class="empty">Sin cambios de estado en el periodo.</div>'; return; }
+  host.innerHTML = events.slice(0,20).map(e=>`
+    <div class="ev ${e.to}"><time>${fmtTime(e.t)}</time>
+      <div class="txt"><b>${e.geo3}</b> pasó de ${ST[e.from]||e.from} a <b>${ST[e.to]||e.to}</b></div></div>`).join("");
+}
+
+load();
+setInterval(load, 5*60*1000); // refresca cada 5 min en el navegador
+</script>
+</body>
+</html>
