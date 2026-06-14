@@ -50,6 +50,11 @@
   .metric{display:flex;flex-direction:column}
   .metric .k{font-size:.72rem;color:var(--muted)}
   .metric .v{font-family:"JetBrains Mono",monospace;font-weight:500;font-size:1.05rem}
+  .conf{display:inline-block;width:7px;height:7px;border-radius:50%;margin-left:5px;vertical-align:middle}
+  .conf.fiable{background:var(--ok)} .conf.dudoso{background:var(--warn)}
+  .conf.no_fiable{background:var(--crit)}
+  .conflegend{font-size:.72rem;color:var(--muted);margin-top:10px;display:flex;gap:12px;flex-wrap:wrap}
+  .conflegend span{display:inline-flex;align-items:center;gap:4px}
   .aqi{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:2rem;line-height:1}
   .note{font-size:.85rem;color:var(--muted);margin-top:10px}
   .alerts{margin-top:8px;font-size:.85rem;color:var(--crit)}
@@ -171,6 +176,8 @@ function renderState(s){
   host.innerHTML = s.zones.map(z=>{
     const st = z.status in ST ? z.status : "ok";
     const m = (k,u)=> (z[k]==null?"—":(Math.round(z[k]*10)/10)+(u||""));
+    const cf = (k)=>{ const c=(z.confidence||{})[k]; return c?`<span class="conf ${c}" title="fiabilidad vs CAMS: ${c}"></span>`:""; };
+    const hasConf = z.confidence && Object.values(z.confidence).some(v=>v);
     return `<div class="card ${st}">
       <div class="row"><span class="zone">${z.geo3}</span>
         <span class="badge ${st}">${ST[st]||st}</span></div>
@@ -178,13 +185,18 @@ function renderState(s){
         <div><div class="metric"><span class="k">AQI</span>
           <span class="aqi" style="color:${COL[st]}">${z.aqi??"—"}</span></div></div>
         <div class="metrics" style="margin:0;flex:1;margin-left:18px">
-          <div class="metric"><span class="k">PM2.5</span><span class="v">${m("pm25"," µg")}</span></div>
+          <div class="metric"><span class="k">PM2.5${cf("pm25")}</span><span class="v">${m("pm25"," µg")}</span></div>
           <div class="metric"><span class="k">Ruido</span><span class="v">${m("noise_db"," dB")}</span></div>
-          <div class="metric"><span class="k">NO₂</span><span class="v">${m("no2"," µg")}</span></div>
+          <div class="metric"><span class="k">NO₂${cf("no2")}</span><span class="v">${m("no2"," µg")}</span></div>
           <div class="metric"><span class="k">Viento</span><span class="v">${m("wind_kmh"," km/h")}</span></div>
         </div></div>
       ${z.alerts?`<div class="alerts">⚠ ${z.alerts}</div>`:""}
       ${z.prediction?`<div class="note">${z.prediction}</div>`:""}
+      ${hasConf?`<div class="conflegend">
+        <span><span class="conf fiable"></span>fiable</span>
+        <span><span class="conf dudoso"></span>dudoso</span>
+        <span><span class="conf no_fiable"></span>no fiable</span>
+        <span style="margin-left:auto">vs CAMS·Copernicus</span></div>`:""}
     </div>`;
   }).join("");
 }
