@@ -55,6 +55,21 @@
   .conf.no_fiable{background:var(--crit)}
   .conflegend{font-size:.72rem;color:var(--muted);margin-top:10px;display:flex;gap:12px;flex-wrap:wrap}
   .conflegend span{display:inline-flex;align-items:center;gap:4px}
+  .sensbar{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  #sensSearch{flex:1;max-width:340px;padding:8px 12px;border:1px solid var(--line);
+    border-radius:8px;font:inherit;background:var(--card);color:var(--ink)}
+  .senscount{font-size:.78rem;color:var(--muted)}
+  .senswrap{max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+  .senstable{width:100%;border-collapse:collapse;font-size:.85rem}
+  .senstable th{position:sticky;top:0;background:var(--card);text-align:left;
+    padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer;
+    font-weight:600;white-space:nowrap;user-select:none}
+  .senstable th:hover{color:var(--accent)}
+  .senstable th.num,.senstable td.num{text-align:right;font-family:"JetBrains Mono",monospace}
+  .senstable td{padding:8px 12px;border-bottom:1px solid var(--line)}
+  .senstable tbody tr:hover{background:rgba(0,0,0,.025)}
+  .senstable .zone-pill{font-family:"JetBrains Mono",monospace;font-size:.78rem;
+    background:rgba(0,0,0,.05);padding:1px 7px;border-radius:5px}
   .aqi{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:2rem;line-height:1}
   .note{font-size:.85rem;color:var(--muted);margin-top:10px}
   .alerts{margin-top:8px;font-size:.85rem;color:var(--crit)}
@@ -125,6 +140,28 @@
     <div class="timeline" id="timeline"><div class="empty">—</div></div>
   </section>
 
+  <section>
+    <p class="eyebrow">Todos los sensores CanAirIO</p>
+    <div class="sensbar">
+      <input type="search" id="sensSearch" placeholder="Buscar por nombre o zona…" autocomplete="off">
+      <span class="senscount" id="sensCount"></span>
+    </div>
+    <div class="senswrap">
+      <table class="senstable" id="sensTable">
+        <thead><tr>
+          <th data-k="name">Sensor</th>
+          <th data-k="geo3">Zona</th>
+          <th data-k="pm25" class="num">PM2.5 µg</th>
+          <th data-k="pm10" class="num">PM10 µg</th>
+          <th data-k="lat" class="num">Lat</th>
+          <th data-k="lon" class="num">Lon</th>
+          <th data-k="last_time">Última lectura</th>
+        </tr></thead>
+        <tbody id="sensBody"><tr><td colspan="7" class="empty">Cargando sensores…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
   <footer>
     <span>Generado automáticamente desde sensores comunitarios. No es una fuente oficial.</span>
     <span id="meta"></span>
@@ -135,6 +172,7 @@
 const ST = {ok:"ok", warning:"atención", critical:"crítico"};
 const COL = {ok:"#2e8b57", warning:"#c98a12", critical:"#c0392b"};
 let HISTORY = null, ACTIVE = null, charts = {};
+let SENSORS = [], SENS_SORT = {k:"geo3", dir:1};
 
 function fmtTime(iso){
   try{ return new Date(iso).toLocaleString("es-ES",{day:"2-digit",month:"short",
@@ -164,6 +202,15 @@ async function load(){
   }catch(e){
     document.getElementById("timeline").innerHTML =
       '<div class="empty">Histórico aún no disponible.</div>';
+  }
+  try{
+    const sn = await fetch("data/sensors.json",{cache:"no-store"}).then(r=>{
+      if(!r.ok) throw new Error("HTTP "+r.status); return r.json();});
+    SENSORS = sn.sensors||[];
+    renderSensors();
+  }catch(e){
+    document.getElementById("sensBody").innerHTML =
+      '<tr><td colspan="7" class="empty">Listado de sensores aún no disponible.</td></tr>';
   }
 }
 
@@ -266,6 +313,49 @@ function renderTimeline(h){
     <div class="ev ${e.to}"><time>${fmtTime(e.t)}</time>
       <div class="txt"><b>${e.geo3}</b> pasó de ${ST[e.from]||e.from} a <b>${ST[e.to]||e.to}</b></div></div>`).join("");
 }
+
+function renderSensors(){
+  const q = (document.getElementById("sensSearch").value||"").toLowerCase().trim();
+  let rows = SENSORS;
+  if(q){
+    rows = rows.filter(s =>
+      (s.name||"").toLowerCase().includes(q) ||
+      (s.geo3||"").toLowerCase().includes(q));
+  }
+  const k = SENS_SORT.k, dir = SENS_SORT.dir;
+  rows = rows.slice().sort((a,b)=>{
+    let x=a[k], y=b[k];
+    if(x==null) return 1; if(y==null) return -1;
+    if(typeof x==="number"&&typeof y==="number") return (x-y)*dir;
+    return String(x).localeCompare(String(y))*dir;
+  });
+  document.getElementById("sensCount").textContent =
+    rows.length + (rows.length===1?" sensor":" sensores") +
+    (q?` (de ${SENSORS.length})`:"");
+  const num = v => v==null ? "—" : v;
+  document.getElementById("sensBody").innerHTML = rows.length ? rows.map(s=>`
+    <tr>
+      <td>${s.name||"—"}</td>
+      <td><span class="zone-pill">${s.geo3||"—"}</span></td>
+      <td class="num">${num(s.pm25)}</td>
+      <td class="num">${num(s.pm10)}</td>
+      <td class="num">${s.lat==null?"—":s.lat}</td>
+      <td class="num">${s.lon==null?"—":s.lon}</td>
+      <td>${s.last_time?fmtTime(s.last_time):"—"}</td>
+    </tr>`).join("") :
+    '<tr><td colspan="7" class="empty">Sin coincidencias.</td></tr>';
+}
+
+// búsqueda y ordenación
+document.getElementById("sensSearch").addEventListener("input", renderSensors);
+document.querySelectorAll(".senstable th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const k = th.dataset.k;
+    SENS_SORT.dir = (SENS_SORT.k===k) ? -SENS_SORT.dir : 1;
+    SENS_SORT.k = k;
+    renderSensors();
+  });
+});
 
 load();
 setInterval(load, 5*60*1000); // refresca cada 5 min en el navegador
