@@ -151,13 +151,16 @@
         <thead><tr>
           <th data-k="name">Sensor</th>
           <th data-k="geo3">Zona</th>
-          <th data-k="pm25" class="num">PM2.5 µg</th>
-          <th data-k="pm10" class="num">PM10 µg</th>
+          <th data-k="pm25" class="num">PM2.5 µg/m³</th>
+          <th data-k="pm10" class="num">PM10 µg/m³</th>
+          <th data-k="no2" class="num">NO₂ µg/m³</th>
+          <th data-k="o3" class="num">O₃ µg/m³</th>
+          <th data-k="db" class="num">Ruido dB</th>
           <th data-k="lat" class="num">Lat</th>
           <th data-k="lon" class="num">Lon</th>
           <th data-k="last_time">Última lectura</th>
         </tr></thead>
-        <tbody id="sensBody"><tr><td colspan="7" class="empty">Cargando sensores…</td></tr></tbody>
+        <tbody id="sensBody"><tr><td colspan="10" class="empty">Cargando sensores…</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -210,7 +213,7 @@ async function load(){
     renderSensors();
   }catch(e){
     document.getElementById("sensBody").innerHTML =
-      '<tr><td colspan="7" class="empty">Listado de sensores aún no disponible.</td></tr>';
+      '<tr><td colspan="10" class="empty">Listado de sensores aún no disponible.</td></tr>';
   }
 }
 
@@ -339,11 +342,14 @@ function renderSensors(){
       <td><span class="zone-pill">${s.geo3||"—"}</span></td>
       <td class="num">${num(s.pm25)}</td>
       <td class="num">${num(s.pm10)}</td>
+      <td class="num">${num(s.no2)}</td>
+      <td class="num">${num(s.o3)}</td>
+      <td class="num">${num(s.db)}</td>
       <td class="num">${s.lat==null?"—":s.lat}</td>
       <td class="num">${s.lon==null?"—":s.lon}</td>
       <td>${s.last_time?fmtTime(s.last_time):"—"}</td>
     </tr>`).join("") :
-    '<tr><td colspan="7" class="empty">Sin coincidencias.</td></tr>';
+    '<tr><td colspan="10" class="empty">Sin coincidencias.</td></tr>';
 }
 
 // búsqueda y ordenación
