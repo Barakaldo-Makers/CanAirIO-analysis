@@ -288,8 +288,22 @@ function renderState(s){
 
 function renderSensorBlock(se){
   const st = se.status in ST ? se.status : "ok";
-  const v = (x,u)=> (x==null?"—":(Math.round(x*10)/10)+(u||""));
-  const cf = (k)=>{ const c=(se.confidence||{})[k]; return c?`<span class="conf ${c}" title="${c}"></span>`:""; };
+  const fmt = (x)=> (x==null?"—":(Math.round(x*10)/10));
+  const confDot = (c)=> c?`<span class="conf ${c}" title="${c}"></span>`:"";
+  // orden de preferencia; las demás métricas se añaden después
+  const order = ["pm25","pm10","pm1","no2","o3","nh3","co","co2","db","tmp","hum","prs"];
+  const metrics = se.metrics || {};
+  const keys = Object.keys(metrics);
+  keys.sort((a,b)=>{
+    const ia = order.indexOf(a), ib = order.indexOf(b);
+    return (ia<0?99:ia) - (ib<0?99:ib);
+  });
+  const cells = keys.map(k=>{
+    const mt = metrics[k];
+    // etiqueta corta: quita la unidad entre paréntesis para el encabezado
+    const short = (mt.label||k).replace(/\s*\(.*\)/,"");
+    return `<span class="sm">${short}${confDot(mt.confidence)} <b>${fmt(mt.value)}</b></span>`;
+  }).join("");
   return `<div class="sensor ${st}">
     <div class="srow">
       <span class="sname">${se.name||se.mac}</span>
@@ -297,11 +311,7 @@ function renderSensorBlock(se){
     </div>
     <div class="smetrics">
       <span class="sm">AQI <b style="color:${COL[st]}">${se.aqi??"—"}</b></span>
-      <span class="sm">PM2.5${cf("pm25")} <b>${v(se.pm25)}</b></span>
-      <span class="sm">PM10${cf("pm10")} <b>${v(se.pm10)}</b></span>
-      <span class="sm">NO₂${cf("no2")} <b>${v(se.no2)}</b></span>
-      <span class="sm">O₃${cf("o3")} <b>${v(se.o3)}</b></span>
-      <span class="sm">Ruido <b>${v(se.noise_db)}</b></span>
+      ${cells}
     </div>
     ${se.alerts?`<div class="salert">⚠ ${se.alerts}</div>`:""}
     ${se.trend?`<div class="snote">${se.trend}</div>`:""}
