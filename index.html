@@ -22,7 +22,7 @@
   body{margin:0;background:var(--bg);color:var(--ink);
     font-family:"Space Grotesk",system-ui,sans-serif;line-height:1.5;
     background-image:radial-gradient(1200px 400px at 80% -10%,rgba(13,110,140,.07),transparent);}
-  .wrap{max-width:1040px;margin:0 auto;padding:28px 20px 60px}
+  .wrap{max-width:1200px;margin:0 auto;padding:28px 20px 60px}
   header{display:flex;align-items:baseline;justify-content:space-between;
     flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--line);padding-bottom:18px}
   h1{font-size:1.55rem;font-weight:700;margin:0;letter-spacing:-.01em}
@@ -33,7 +33,10 @@
   .eyebrow{font-family:"JetBrains Mono",monospace;font-size:.72rem;
     text-transform:uppercase;letter-spacing:.14em;color:var(--muted);margin:0 0 14px}
   /* tarjetas de estado por zona */
-  .zones{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+  .zones{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+  /* una zona con el detalle de sensores abierto ocupa todo el ancho */
+  .card:has(.sensors[open]){grid-column:1/-1}
+  .card.expanded{grid-column:1/-1}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
     padding:18px 18px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
   .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
@@ -59,7 +62,9 @@
   .sensors>summary{cursor:pointer;font-size:.8rem;color:var(--muted);
     user-select:none;padding:4px 0}
   .sensors>summary:hover{color:var(--accent)}
-  .sensor{margin-top:10px;padding:10px 12px;border:1px solid var(--line);
+  .sensors[open] .sensorgrid{display:grid;gap:10px;margin-top:10px;
+    grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+  .sensor{padding:10px 12px;border:1px solid var(--line);
     border-radius:8px;border-left:3px solid var(--muted)}
   .sensor.ok{border-left-color:var(--ok)}
   .sensor.warning{border-left-color:var(--warn)}
@@ -248,7 +253,7 @@ function renderState(s){
     const sensorsHtml = sensors.length ? `
       <details class="sensors">
         <summary>${sensors.length} ${sensors.length===1?"sensor":"sensores"} en esta zona · ver detalle</summary>
-        ${sensors.map(se=>renderSensorBlock(se)).join("")}
+        <div class="sensorgrid">${sensors.map(se=>renderSensorBlock(se)).join("")}</div>
       </details>` : "";
     return `<div class="card ${st}">
       <div class="row"><span class="zone">${z.geo3}</span>
@@ -272,6 +277,13 @@ function renderState(s){
       ${sensorsHtml}
     </div>`;
   }).join("");
+  // refuerzo (por si el navegador no soporta :has): marca la tarjeta al abrir
+  host.querySelectorAll(".sensors").forEach(d=>{
+    d.addEventListener("toggle", ()=>{
+      const card = d.closest(".card");
+      if(card) card.classList.toggle("expanded", d.open);
+    });
+  });
 }
 
 function renderSensorBlock(se){
