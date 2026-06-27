@@ -55,6 +55,22 @@
   .conf.no_fiable{background:var(--crit)}
   .conflegend{font-size:.72rem;color:var(--muted);margin-top:10px;display:flex;gap:12px;flex-wrap:wrap}
   .conflegend span{display:inline-flex;align-items:center;gap:4px}
+  .sensors{margin-top:14px;border-top:1px solid var(--line);padding-top:8px}
+  .sensors>summary{cursor:pointer;font-size:.8rem;color:var(--muted);
+    user-select:none;padding:4px 0}
+  .sensors>summary:hover{color:var(--accent)}
+  .sensor{margin-top:10px;padding:10px 12px;border:1px solid var(--line);
+    border-radius:8px;border-left:3px solid var(--muted)}
+  .sensor.ok{border-left-color:var(--ok)}
+  .sensor.warning{border-left-color:var(--warn)}
+  .sensor.critical{border-left-color:var(--crit)}
+  .srow{display:flex;justify-content:space-between;align-items:center}
+  .sname{font-family:"JetBrains Mono",monospace;font-size:.82rem;font-weight:600}
+  .smetrics{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:8px;font-size:.78rem;color:var(--muted)}
+  .smetrics .sm b{color:var(--ink);font-family:"JetBrains Mono",monospace;margin-left:2px}
+  .salert{margin-top:8px;font-size:.78rem;color:var(--crit)}
+  .snote{margin-top:6px;font-size:.78rem;color:var(--muted);line-height:1.4}
+  .sqnote{margin-top:6px;font-size:.74rem;color:var(--warn);font-style:italic}
   .sensbar{display:flex;align-items:center;gap:12px;margin-bottom:12px}
   #sensSearch{flex:1;max-width:340px;padding:8px 12px;border:1px solid var(--line);
     border-radius:8px;font:inherit;background:var(--card);color:var(--ink)}
@@ -228,6 +244,12 @@ function renderState(s){
     const m = (k,u)=> (z[k]==null?"—":(Math.round(z[k]*10)/10)+(u||""));
     const cf = (k)=>{ const c=(z.confidence||{})[k]; return c?`<span class="conf ${c}" title="fiabilidad vs CAMS: ${c}"></span>`:""; };
     const hasConf = z.confidence && Object.values(z.confidence).some(v=>v);
+    const sensors = z.sensors || [];
+    const sensorsHtml = sensors.length ? `
+      <details class="sensors">
+        <summary>${sensors.length} ${sensors.length===1?"sensor":"sensores"} en esta zona · ver detalle</summary>
+        ${sensors.map(se=>renderSensorBlock(se)).join("")}
+      </details>` : "";
     return `<div class="card ${st}">
       <div class="row"><span class="zone">${z.geo3}</span>
         <span class="badge ${st}">${ST[st]||st}</span></div>
@@ -247,8 +269,33 @@ function renderState(s){
         <span><span class="conf dudoso"></span>dudoso</span>
         <span><span class="conf no_fiable"></span>no fiable</span>
         <span style="margin-left:auto">vs CAMS·Copernicus</span></div>`:""}
+      ${sensorsHtml}
     </div>`;
   }).join("");
+}
+
+function renderSensorBlock(se){
+  const st = se.status in ST ? se.status : "ok";
+  const v = (x,u)=> (x==null?"—":(Math.round(x*10)/10)+(u||""));
+  const cf = (k)=>{ const c=(se.confidence||{})[k]; return c?`<span class="conf ${c}" title="${c}"></span>`:""; };
+  return `<div class="sensor ${st}">
+    <div class="srow">
+      <span class="sname">${se.name||se.mac}</span>
+      <span class="badge ${st}">${ST[st]||st}</span>
+    </div>
+    <div class="smetrics">
+      <span class="sm">AQI <b style="color:${COL[st]}">${se.aqi??"—"}</b></span>
+      <span class="sm">PM2.5${cf("pm25")} <b>${v(se.pm25)}</b></span>
+      <span class="sm">PM10${cf("pm10")} <b>${v(se.pm10)}</b></span>
+      <span class="sm">NO₂${cf("no2")} <b>${v(se.no2)}</b></span>
+      <span class="sm">O₃${cf("o3")} <b>${v(se.o3)}</b></span>
+      <span class="sm">Ruido <b>${v(se.noise_db)}</b></span>
+    </div>
+    ${se.alerts?`<div class="salert">⚠ ${se.alerts}</div>`:""}
+    ${se.trend?`<div class="snote">${se.trend}</div>`:""}
+    ${se.prediction?`<div class="snote">${se.prediction}</div>`:""}
+    ${se.data_quality_note?`<div class="sqnote">${se.data_quality_note}</div>`:""}
+  </div>`;
 }
 
 function buildPicker(zones){
