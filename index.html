@@ -91,6 +91,10 @@
   .senstable tbody tr:hover{background:rgba(0,0,0,.025)}
   .senstable .zone-pill{font-family:"JetBrains Mono",monospace;font-size:.78rem;
     background:rgba(0,0,0,.05);padding:1px 7px;border-radius:5px}
+  .senstable th .u{display:block;font-weight:400;font-size:.66rem;color:var(--muted);
+    font-family:"JetBrains Mono",monospace;margin-top:1px}
+  .senstable td.outrange{color:var(--crit);font-weight:600;
+    background:var(--crit-bg)}
   .aqi{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:2rem;line-height:1}
   .note{font-size:.85rem;color:var(--muted);margin-top:10px}
   .alerts{margin-top:8px;font-size:.85rem;color:var(--crit)}
@@ -172,13 +176,13 @@
         <thead><tr>
           <th data-k="name">Sensor</th>
           <th data-k="geo3">Zona</th>
-          <th data-k="pm25" class="num">PM2.5 µg/m³</th>
-          <th data-k="pm10" class="num">PM10 µg/m³</th>
-          <th data-k="no2" class="num">NO₂ µg/m³</th>
-          <th data-k="o3" class="num">O₃ µg/m³</th>
-          <th data-k="db" class="num">Ruido dB</th>
-          <th data-k="lat" class="num">Lat</th>
-          <th data-k="lon" class="num">Lon</th>
+          <th data-k="pm25" class="num">PM2.5<span class="u">µg/m³</span></th>
+          <th data-k="pm10" class="num">PM10<span class="u">µg/m³</span></th>
+          <th data-k="no2" class="num">NO₂<span class="u">µg/m³</span></th>
+          <th data-k="o3" class="num">O₃<span class="u">µg/m³</span></th>
+          <th data-k="nh3" class="num">NH₃<span class="u">µg/m³</span></th>
+          <th data-k="co" class="num">CO<span class="u">mg/m³</span></th>
+          <th data-k="db" class="num">Ruido<span class="u">dB</span></th>
           <th data-k="last_time">Última lectura</th>
         </tr></thead>
         <tbody id="sensBody"><tr><td colspan="10" class="empty">Cargando sensores…</td></tr></tbody>
@@ -404,18 +408,18 @@ function renderSensors(){
   document.getElementById("sensCount").textContent =
     rows.length + (rows.length===1?" sensor":" sensores") +
     (q?` (de ${SENSORS.length})`:"");
-  const num = v => v==null ? "—" : v;
+  const cell = (s,k) => {
+    const v = s[k];
+    if(v==null) return '<td class="num">—</td>';
+    const out = s.flags && s.flags[k];
+    return `<td class="num${out?' outrange':''}"${out?' title="fuera de rango físico"':''}>${v}${out?' ⚠':''}</td>`;
+  };
   document.getElementById("sensBody").innerHTML = rows.length ? rows.map(s=>`
     <tr>
       <td>${s.name||"—"}</td>
       <td><span class="zone-pill">${s.geo3||"—"}</span></td>
-      <td class="num">${num(s.pm25)}</td>
-      <td class="num">${num(s.pm10)}</td>
-      <td class="num">${num(s.no2)}</td>
-      <td class="num">${num(s.o3)}</td>
-      <td class="num">${num(s.db)}</td>
-      <td class="num">${s.lat==null?"—":s.lat}</td>
-      <td class="num">${s.lon==null?"—":s.lon}</td>
+      ${cell(s,"pm25")}${cell(s,"pm10")}${cell(s,"no2")}${cell(s,"o3")}
+      ${cell(s,"nh3")}${cell(s,"co")}${cell(s,"db")}
       <td>${s.last_time?fmtTime(s.last_time):"—"}</td>
     </tr>`).join("") :
     '<tr><td colspan="10" class="empty">Sin coincidencias.</td></tr>';
