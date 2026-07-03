@@ -273,6 +273,8 @@ function renderState(s){
         </div></div>
       ${z.alerts?`<div class="alerts">⚠ ${z.alerts}</div>`:""}
       ${z.prediction?`<div class="note">${z.prediction}</div>`:""}
+      ${z.rose_note?`<div class="note">🧭 ${z.rose_note}</div>`:""}
+      ${z.peer_notes?`<div class="alerts">⚠ Consenso entre sensores: ${z.peer_notes}</div>`:""}
       ${hasConf?`<div class="conflegend">
         <span><span class="conf fiable"></span>fiable</span>
         <span><span class="conf dudoso"></span>dudoso</span>
@@ -321,6 +323,8 @@ function renderSensorBlock(se){
     ${se.trend?`<div class="snote">${se.trend}</div>`:""}
     ${se.prediction?`<div class="snote">${se.prediction}</div>`:""}
     ${se.data_quality_note?`<div class="sqnote">${se.data_quality_note}</div>`:""}
+    ${(()=>{const d=Object.entries(se.peer_check||{}).filter(([k,v])=>v==="divergente").map(([k])=>k.toUpperCase());
+      return d.length?`<div class="salert">⚠ Diverge del consenso local: ${d.join(", ")}</div>`:"";})()}
   </div>`;
 }
 
