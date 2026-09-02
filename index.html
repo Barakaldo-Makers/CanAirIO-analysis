@@ -76,6 +76,9 @@
   .salert{margin-top:8px;font-size:.78rem;color:var(--crit)}
   .snote{margin-top:6px;font-size:.78rem;color:var(--muted);line-height:1.4}
   .sqnote{margin-top:6px;font-size:.74rem;color:var(--warn);font-style:italic}
+  .ep-alert{margin-top:6px;font-size:.78rem;color:#c00;background:#ffeaea;
+    padding:4px 8px;border-radius:6px;border-left:3px solid #c00}
+  .caqi-badge{display:inline-block;margin-top:8px}
   .sensbar{display:flex;align-items:center;gap:12px;margin-bottom:12px}
   #sensSearch{flex:1;max-width:340px;padding:8px 12px;border:1px solid var(--line);
     border-radius:8px;font:inherit;background:var(--card);color:var(--ink)}
@@ -275,6 +278,29 @@ function renderState(s){
       ${z.prediction?`<div class="note">${z.prediction}</div>`:""}
       ${z.rose_note?`<div class="note">🧭 ${z.rose_note}</div>`:""}
       ${z.peer_notes?`<div class="alerts">⚠ Consenso entre sensores: ${z.peer_notes}</div>`:""}
+      ${(()=>{
+        const ep = z.episodes;
+        if(!ep || !ep.length) return "";
+        const labels = {"db":"Ruido","pm25":"PM2.5","pm10":"PM10","no2":"NO₂"};
+        return ep.map(e=>`<div class="ep-alert">🔴 Episodio sostenido de ${labels[e.metric]||e.metric}: ${e.duration_h}h · pico ${e.peak} · media ${e.mean}</div>`).join("");
+      })()}
+      ${(()=>{
+        const ec = z.env_correlations;
+        if(!ec) return "";
+        const notes = [];
+        if(ec.pm25_vs_rain && ec.pm25_vs_rain.p_value < 0.05)
+          notes.push(`🌧️ ${ec.pm25_vs_rain.note}`);
+        if(ec.pm25_vs_pressure_trend && ec.pm25_vs_pressure_trend.p_value < 0.05)
+          notes.push(`📈 ${ec.pm25_vs_pressure_trend.note}`);
+        return notes.map(n=>`<div class="note">${n}</div>`).join("");
+      })()}
+      ${(()=>{
+        const cq = z.caqi;
+        if(!cq || !cq.pm25) return "";
+        const pm = cq.pm25;
+        return `<div class="caqi-badge" style="background:${pm.color}20;border-left:3px solid ${pm.color};padding:4px 8px;border-radius:6px;font-size:.78rem;margin-top:6px">
+          CAQI <b style="color:${pm.color}">${pm.label}</b> · PM2.5 media ${pm.value} µg/m³</div>`;
+      })()}
       ${hasConf?`<div class="conflegend">
         <span><span class="conf fiable"></span>fiable</span>
         <span><span class="conf dudoso"></span>dudoso</span>
@@ -323,6 +349,12 @@ function renderSensorBlock(se){
     ${se.trend?`<div class="snote">${se.trend}</div>`:""}
     ${se.prediction?`<div class="snote">${se.prediction}</div>`:""}
     ${se.data_quality_note?`<div class="sqnote">${se.data_quality_note}</div>`:""}
+    ${(()=>{
+      const pc = se.pm_corrections || {};
+      const m25 = pc.pm25 || {};
+      if(!m25.malm_corrected_last) return "";
+      return `<div class="snote">💧 PM2.5 corregido por humedad (${m25.malm_rh}% HR): <b>${m25.malm_corrected_last} µg/m³</b> (crudo: ${m25.raw_last||"—"})</div>`;
+    })()}
     ${(()=>{const d=Object.entries(se.peer_check||{}).filter(([k,v])=>v==="divergente").map(([k])=>k.toUpperCase());
       return d.length?`<div class="salert">⚠ Diverge del consenso local: ${d.join(", ")}</div>`:"";})()}
   </div>`;
