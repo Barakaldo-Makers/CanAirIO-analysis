@@ -272,7 +272,7 @@ function renderState(s){
           <div class="metric"><span class="k">PM2.5${cf("pm25")}</span><span class="v">${m("pm25"," µg")}</span></div>
           <div class="metric"><span class="k">Ruido</span><span class="v">${m("noise_db"," dB")}</span></div>
           <div class="metric"><span class="k">NO₂${cf("no2")}</span><span class="v">${m("no2"," µg")}</span></div>
-          <div class="metric"><span class="k">Viento</span><span class="v">${m("wind_kmh"," km/h")}</span></div>
+          <div class="metric"><span class="k">Viento</span><span class="v">${m("wind_kmh"," km/h")}${z.wind_dir_txt?` <span style="font-size:.85em;color:var(--muted)">${z.wind_dir_txt}</span>`:""}</span></div>
         </div></div>
       ${z.alerts?`<div class="alerts">⚠ ${z.alerts}</div>`:""}
       ${z.prediction?`<div class="note">${z.prediction}</div>`:""}
