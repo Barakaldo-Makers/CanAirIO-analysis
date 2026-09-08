@@ -276,6 +276,17 @@ function renderState(s){
         </div></div>
       ${z.alerts?`<div class="alerts">⚠ ${z.alerts}</div>`:""}
       ${z.prediction?`<div class="note">${z.prediction}</div>`:""}
+      ${(()=>{
+        const n=z.weather_now||{};
+        const parts=[];
+        if(n.weather_icon&&n.weather_desc) parts.push(n.weather_icon+' '+n.weather_desc);
+        if(n.temperature_c!=null) parts.push(n.temperature_c+'°C');
+        if(n.cloud_cover_pct!=null) parts.push('☁ '+n.cloud_cover_pct+'%');
+        if(n.visibility_km!=null) parts.push('👁 '+n.visibility_km+' km');
+        if(n.uv_index!=null&&n.uv_index>0) parts.push('UV '+n.uv_index);
+        if(n.snow_next12h) parts.push('❄️ '+n.snow_next12h+' cm prev.');
+        return parts.length?`<div class="note meteo">${parts.join(' · ')}</div>`:"";
+      })()}
       ${z.rose_note?`<div class="note">🧭 ${z.rose_note}</div>`:""}
       ${z.peer_notes?`<div class="alerts">⚠ Consenso entre sensores: ${z.peer_notes}</div>`:""}
       ${(()=>{
