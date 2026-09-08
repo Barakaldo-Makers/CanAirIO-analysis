@@ -129,7 +129,20 @@
   a{color:var(--accent)}
   .empty{color:var(--muted);font-size:.9rem;padding:20px;text-align:center;
     border:1px dashed var(--line);border-radius:14px}
+  /* mapa */
+  #map{height:420px;border-radius:12px;border:1px solid var(--line);overflow:hidden}
+  .leaflet-popup-content{font-family:"Space Grotesk",sans-serif;min-width:180px}
+  .map-popup-badge{display:inline-block;padding:2px 8px;border-radius:6px;
+    font-size:.78rem;font-weight:600;margin-bottom:4px}
+  .map-popup-badge.ok{background:var(--ok-bg);color:var(--ok)}
+  .map-popup-badge.warning{background:var(--warn-bg);color:var(--warn)}
+  .map-popup-badge.critical{background:var(--crit-bg);color:var(--crit)}
+  .map-popup-btn{display:block;margin-top:8px;padding:5px 10px;
+    background:var(--accent);color:#fff;border:none;border-radius:6px;
+    font:inherit;font-size:.8rem;cursor:pointer;width:100%;text-align:center}
+  .map-popup-btn:hover{opacity:.85}
 </style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 </head>
 <body>
 <div class="wrap">
@@ -140,6 +153,12 @@
     </div>
     <div class="updated" id="updated">cargando…</div>
   </header>
+
+  <!-- MAPA MUNDIAL DE ZONAS ACTIVAS -->
+  <section>
+    <p class="eyebrow">Mapa de zonas activas</p>
+    <div id="map"></div>
+  </section>
 
   <section>
     <p class="eyebrow">Estado actual por zona</p>
@@ -202,7 +221,7 @@
 <script>
 const ST = {ok:"ok", warning:"atención", critical:"crítico"};
 const COL = {ok:"#2e8b57", warning:"#c98a12", critical:"#c0392b"};
-let HISTORY = null, ACTIVE = null, charts = {};
+let HISTORY = null, ACTIVE = null, charts = {}, STATE = null;
 let SENSORS = [], SENS_SORT = {k:"geo3", dir:1};
 
 function fmtTime(iso){
@@ -216,7 +235,9 @@ async function load(){
   try{
     const s = await fetch("data/state.json",{cache:"no-store"}).then(r=>{
       if(!r.ok) throw new Error("HTTP "+r.status); return r.json();});
+    STATE = s;
     renderState(s);
+    if(window.L) renderMap(s);
     buildPicker((s.zones||[]).map(z=>z.geo3));
     sOk = true;
   }catch(e){
@@ -482,6 +503,128 @@ document.querySelectorAll(".senstable th").forEach(th=>{
     renderSensors();
   });
 });
+
+// ── MAPA LEAFLET ────────────────────────────────────────────────────────────
+// Carga Leaflet dinámicamente para no bloquear el resto de la página
+const _L = document.createElement("script");
+_L.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+_L.onload = () => { if(STATE) renderMap(STATE); };
+document.head.appendChild(_L);
+
+// Decodificador de geohash a coordenadas (sin dependencias externas)
+function geohashCenter(gh){
+  const B="0123456789bcdefghjkmnpqrstuvwxyz";
+  let lat=[-90,90], lon=[-180,180], even=true;
+  for(const c of gh.toLowerCase()){
+    let cd=B.indexOf(c); if(cd<0) continue;
+    for(let mask=16; mask>0; mask>>=1){
+      if(even){const m=(lon[0]+lon[1])/2; cd&mask?lon[0]=m:lon[1]=m;}
+      else    {const m=(lat[0]+lat[1])/2; cd&mask?lat[0]=m:lat[1]=m;}
+      even=!even;
+    }
+  }
+  return [(lat[0]+lat[1])/2, (lon[0]+lon[1])/2];
+}
+
+let _map = null;
+
+function renderMap(s){
+  if(!window.L) return;
+  const zones = (s.zones||[]).filter(z=>z.geo3);
+  if(!zones.length) return;
+
+  // inicializar mapa solo una vez
+  if(!_map){
+    _map = L.map("map", {zoomControl:true});
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 18
+    }).addTo(_map);
+  } else {
+    _map.eachLayer(l => { if(l instanceof L.CircleMarker) _map.removeLayer(l); });
+  }
+
+  const COL_MAP = {ok:"#2e8b57", warning:"#c98a12", critical:"#c0392b"};
+  const ST_MAP  = {ok:"OK", warning:"ATENCIÓN", critical:"CRÍTICO"};
+  const bounds  = [];
+
+  zones.forEach(z=>{
+    let lat, lon;
+    try{ [lat,lon] = geohashCenter(z.geo3); } catch(e){ return; }
+    bounds.push([lat,lon]);
+    const col   = COL_MAP[z.status] || "#5a6b73";
+    const aqi   = z.aqi ?? "—";
+    const pm25  = z.pm25!=null ? z.pm25+" µg/m³" : "—";
+    const wkm   = z.wind_kmh!=null ? z.wind_kmh+" km/h "+(z.wind_dir_txt||"") : "—";
+    const icon  = (z.weather_now||{}).weather_icon||"";
+    const desc  = (z.weather_now||{}).weather_desc||"";
+    const temp  = (z.weather_now||{}).temperature_c!=null
+                  ? (z.weather_now.temperature_c)+"°C" : "";
+    const st    = z.status||"ok";
+
+    const marker = L.circleMarker([lat,lon], {
+      radius: 14, color: col, weight: 2,
+      fillColor: col, fillOpacity: 0.25
+    }).addTo(_map);
+
+    // etiqueta con geo3 sobre el marcador
+    const lbl = L.divIcon({
+      className:"",
+      html:`<div style="font:700 .72rem 'JetBrains Mono',monospace;
+            color:${col};text-shadow:0 0 3px #fff,0 0 3px #fff;
+            white-space:nowrap">${z.geo3.toUpperCase()}</div>`,
+      iconAnchor:[-16,-6]
+    });
+    L.marker([lat,lon], {icon:lbl, interactive:false}).addTo(_map);
+
+    // popup con resumen + botón para ir a la tarjeta
+    const pop = L.popup({maxWidth:220, closeButton:false}).setContent(`
+      <div>
+        <span class="map-popup-badge ${st}">${ST_MAP[st]||st}</span>
+        <div style="font-weight:700;font-size:1rem;margin:2px 0">${z.geo3.toUpperCase()}</div>
+        ${icon?`<div style="font-size:.85rem">${icon} ${desc} ${temp}</div>`:""}
+        <div style="font-size:.82rem;color:#5a6b73;margin-top:4px">
+          AQI <b>${aqi}</b> · PM2.5 <b>${pm25}</b><br>
+          Viento <b>${wkm}</b>
+        </div>
+        <button class="map-popup-btn" onclick="goToZone('${z.geo3}')">
+          Ver análisis completo ↓
+        </button>
+      </div>`);
+
+    marker.bindPopup(pop);
+    marker.on("click", ()=> marker.openPopup());
+  });
+
+  if(bounds.length===1){
+    _map.setView(bounds[0], 8);
+  } else if(bounds.length>1){
+    _map.fitBounds(L.latLngBounds(bounds), {padding:[30,30], maxZoom:5});
+  }
+}
+
+// Desplaza al card de la zona y expande sus sensores
+function goToZone(geo3){
+  const cards = document.querySelectorAll(".card");
+  for(const card of cards){
+    const zoneEl = card.querySelector(".zone");
+    if(zoneEl && zoneEl.textContent.trim().toLowerCase()===geo3.toLowerCase()){
+      card.scrollIntoView({behavior:"smooth", block:"start"});
+      // abre el detalle de sensores si existe
+      const det = card.querySelector(".sensors");
+      if(det && !det.open){
+        det.open=true;
+        card.classList.add("expanded");
+      }
+      // parpadeo sutil para destacar la tarjeta
+      card.style.outline="2px solid var(--accent)";
+      setTimeout(()=>card.style.outline="", 1500);
+      break;
+    }
+  }
+  // cierra el popup del mapa
+  if(_map) _map.closePopup();
+}
 
 load();
 setInterval(load, 5*60*1000); // refresca cada 5 min en el navegador
