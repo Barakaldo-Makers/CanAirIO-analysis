@@ -141,6 +141,13 @@
     background:var(--accent);color:#fff;border:none;border-radius:6px;
     font:inherit;font-size:.8rem;cursor:pointer;width:100%;text-align:center}
   .map-popup-btn:hover{opacity:.85}
+  @keyframes windflow{
+    0%  {opacity:0;  margin-left:-14px}
+    15% {opacity:.0}
+    40% {opacity:.85}
+    85% {opacity:.85}
+    100%{opacity:0;  margin-left:14px}
+  }
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 </head>
@@ -586,18 +593,33 @@ function renderMap(s){
       fillColor:col, fillOpacity:0.25
     }).addTo(_map);
 
-    // flecha de dirección del viento (compartida por zona)
-    if(wdir!=null){
-      const arrow = L.divIcon({
+    if(wdir!=null && info.wind_kmh!=null){
+      const speed = Math.min(info.wind_kmh, 60);
+      const dur = Math.max(0.8, 3.5 - speed/25).toFixed(2);
+      const nPart = 5;
+      // contenedor rotado según la dirección del viento
+      // partículas se mueven de izquierda a derecha (= en dirección del viento)
+      let rows = "";
+      for(let i=0;i<nPart;i++){
+        const delay = (-(i/nPart)*dur).toFixed(2);
+        const offset = ((i-(nPart-1)/2)*5).toFixed(1); // filas perpendiculares
+        rows += `<div style="
+          position:absolute;left:0;right:0;
+          top:calc(50% + ${offset}px);
+          animation:windflow ${dur}s linear ${delay}s infinite;
+          color:${col};font-size:.9rem;
+          text-shadow:0 0 3px #fff,0 0 3px #fff;
+          text-align:center;opacity:0">›</div>`;
+      }
+      const sz = 44;
+      const flowIcon = L.divIcon({
         className:"",
-        html:`<div style="transform:rotate(${wdir}deg);font-size:.95rem;
-              line-height:1;color:${col};
-              text-shadow:0 0 3px #fff,0 0 3px #fff;
-              width:18px;height:18px;display:flex;
-              align-items:center;justify-content:center">↑</div>`,
-        iconSize:[18,18], iconAnchor:[9,9]
+        html:`<div style="
+          position:relative;width:${sz}px;height:${sz}px;
+          transform:rotate(${wdir}deg)">${rows}</div>`,
+        iconSize:[sz,sz], iconAnchor:[sz/2,sz/2]
       });
-      L.marker([se.lat,se.lon],{icon:arrow,interactive:false,zIndexOffset:10}).addTo(_map);
+      L.marker([se.lat,se.lon],{icon:flowIcon,interactive:false,zIndexOffset:5}).addTo(_map);
     }
 
     // etiqueta con nombre corto
