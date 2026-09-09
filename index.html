@@ -260,6 +260,7 @@ async function load(){
       if(!r.ok) throw new Error("HTTP "+r.status); return r.json();});
     SENSORS = sn.sensors||[];
     renderSensors();
+    if(window.L && STATE) renderMap(STATE);
   }catch(e){
     document.getElementById("sensBody").innerHTML =
       '<tr><td colspan="10" class="empty">Listado de sensores aún no disponible.</td></tr>';
@@ -530,76 +531,119 @@ let _map = null;
 
 function renderMap(s){
   if(!window.L) return;
-  const zones = (s.zones||[]).filter(z=>z.geo3);
-  if(!zones.length) return;
 
-  // inicializar mapa solo una vez
+  // índice de sensores por mac desde state.json para obtener estado/AQI
+  const sensorIndex = {};
+  (s.zones||[]).forEach(z=>{
+    (z.sensors||[]).forEach(se=>{
+      sensorIndex[se.mac] = {...se, zone_status: z.status,
+                             wind_kmh: z.wind_kmh, wind_dir_deg: z.wind_dir_deg,
+                             wind_dir_txt: z.wind_dir_txt,
+                             weather_now: z.weather_now};
+    });
+  });
+
   if(!_map){
     _map = L.map("map", {zoomControl:true});
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 18
+      attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom:18
     }).addTo(_map);
   } else {
-    _map.eachLayer(l => { if(l instanceof L.CircleMarker) _map.removeLayer(l); });
+    _map.eachLayer(l=>{ if(!(l instanceof L.TileLayer)) _map.removeLayer(l); });
   }
 
   const COL_MAP = {ok:"#2e8b57", warning:"#c98a12", critical:"#c0392b"};
   const ST_MAP  = {ok:"OK", warning:"ATENCIÓN", critical:"CRÍTICO"};
-  const bounds  = [];
+  // color por PM2.5 según CAQI si no hay estado del análisis
+  function pm25color(v){
+    if(v==null) return "#5a6b73";
+    if(v<10)  return "#2e8b57";
+    if(v<25)  return "#c98a12";
+    return "#c0392b";
+  }
 
-  zones.forEach(z=>{
-    let lat, lon;
-    try{ [lat,lon] = geohashCenter(z.geo3); } catch(e){ return; }
-    bounds.push([lat,lon]);
-    const col   = COL_MAP[z.status] || "#5a6b73";
-    const aqi   = z.aqi ?? "—";
-    const pm25  = z.pm25!=null ? z.pm25+" µg/m³" : "—";
-    const wkm   = z.wind_kmh!=null ? z.wind_kmh+" km/h "+(z.wind_dir_txt||"") : "—";
-    const icon  = (z.weather_now||{}).weather_icon||"";
-    const desc  = (z.weather_now||{}).weather_desc||"";
-    const temp  = (z.weather_now||{}).temperature_c!=null
-                  ? (z.weather_now.temperature_c)+"°C" : "";
-    const st    = z.status||"ok";
+  const bounds = [];
 
-    const marker = L.circleMarker([lat,lon], {
-      radius: 14, color: col, weight: 2,
-      fillColor: col, fillOpacity: 0.25
+  // marcadores por sensor (desde sensors.json)
+  (SENSORS||[]).forEach(se=>{
+    if(se.lat==null || se.lon==null) return;
+    bounds.push([se.lat, se.lon]);
+    const info  = sensorIndex[se.mac] || {};
+    const st    = info.status || "ok";
+    const col   = COL_MAP[st] || pm25color(se.pm25);
+    const aqi   = info.aqi ?? "—";
+    const wkm   = info.wind_kmh!=null ? info.wind_kmh+" km/h "+(info.wind_dir_txt||"") : "—";
+    const wdir  = info.wind_dir_deg;
+    const icon  = (info.weather_now||{}).weather_icon||"";
+    const desc  = (info.weather_now||{}).weather_desc||"";
+    const temp  = (info.weather_now||{}).temperature_c!=null
+                  ? info.weather_now.temperature_c+"°C" : "";
+
+    // marcador circular del sensor
+    const marker = L.circleMarker([se.lat, se.lon], {
+      radius:10, color:col, weight:2,
+      fillColor:col, fillOpacity:0.25
     }).addTo(_map);
 
-    // etiqueta con geo3 sobre el marcador
+    // flecha de dirección del viento (compartida por zona)
+    if(wdir!=null){
+      const arrow = L.divIcon({
+        className:"",
+        html:`<div style="transform:rotate(${wdir}deg);font-size:.95rem;
+              line-height:1;color:${col};
+              text-shadow:0 0 3px #fff,0 0 3px #fff;
+              width:18px;height:18px;display:flex;
+              align-items:center;justify-content:center">↑</div>`,
+        iconSize:[18,18], iconAnchor:[9,9]
+      });
+      L.marker([se.lat,se.lon],{icon:arrow,interactive:false,zIndexOffset:10}).addTo(_map);
+    }
+
+    // etiqueta con nombre corto
+    const shortName = se.name ? se.name.replace(/^EZT|^U33/i,"").slice(0,8) : se.mac.slice(-5);
     const lbl = L.divIcon({
       className:"",
-      html:`<div style="font:700 .72rem 'JetBrains Mono',monospace;
+      html:`<div style="font:600 .65rem 'JetBrains Mono',monospace;
             color:${col};text-shadow:0 0 3px #fff,0 0 3px #fff;
-            white-space:nowrap">${z.geo3.toUpperCase()}</div>`,
-      iconAnchor:[-16,-6]
+            white-space:nowrap;margin-top:14px">${shortName}</div>`,
+      iconAnchor:[-2,-4]
     });
-    L.marker([lat,lon], {icon:lbl, interactive:false}).addTo(_map);
+    L.marker([se.lat,se.lon],{icon:lbl,interactive:false}).addTo(_map);
 
-    // popup con resumen + botón para ir a la tarjeta
-    const pop = L.popup({maxWidth:220, closeButton:false}).setContent(`
+    // métricas para el popup
+    const num = v => v==null?"—":v;
+    const flag = (k)=> (se.flags||{})[k] ? " ⚠":"";
+    const rows = [
+      se.pm25!=null  ? `PM2.5 <b>${num(se.pm25)}</b> µg/m³${flag("pm25")}` : null,
+      se.pm10!=null  ? `PM10 <b>${num(se.pm10)}</b> µg/m³${flag("pm10")}` : null,
+      se.db!=null&&se.db>0   ? `Ruido <b>${num(se.db)}</b> dB${flag("db")}` : null,
+      se.nh3!=null   ? `NH₃ <b>${num(se.nh3)}</b> µg/m³${flag("nh3")}` : null,
+      se.no2!=null&&se.no2>0 ? `NO₂ <b>${num(se.no2)}</b> µg/m³${flag("no2")}` : null,
+      se.o3!=null&&se.o3>0   ? `O₃ <b>${num(se.o3)}</b> µg/m³${flag("o3")}` : null,
+    ].filter(Boolean).join("<br>");
+
+    const pop = L.popup({maxWidth:230, closeButton:false}).setContent(`
       <div>
         <span class="map-popup-badge ${st}">${ST_MAP[st]||st}</span>
-        <div style="font-weight:700;font-size:1rem;margin:2px 0">${z.geo3.toUpperCase()}</div>
-        ${icon?`<div style="font-size:.85rem">${icon} ${desc} ${temp}</div>`:""}
-        <div style="font-size:.82rem;color:#5a6b73;margin-top:4px">
-          AQI <b>${aqi}</b> · PM2.5 <b>${pm25}</b><br>
-          Viento <b>${wkm}</b>
-        </div>
-        <button class="map-popup-btn" onclick="goToZone('${z.geo3}')">
-          Ver análisis completo ↓
+        <div style="font-weight:700;font-size:.95rem;margin:2px 0">${se.name||se.mac}</div>
+        <div style="font-size:.78rem;color:#5a6b73">${se.geo3?.toUpperCase()||""}</div>
+        ${icon?`<div style="font-size:.82rem;margin-top:3px">${icon} ${desc} ${temp}</div>`:""}
+        <div style="font-size:.82rem;margin-top:6px">${rows||"Sin métricas"}</div>
+        <div style="font-size:.78rem;color:#5a6b73;margin-top:4px">AQI <b>${aqi}</b> · Viento <b>${wkm}</b></div>
+        <button class="map-popup-btn" onclick="goToZone('${se.geo3}')">
+          Ver análisis de zona ${(se.geo3||"").toUpperCase()} ↓
         </button>
       </div>`);
 
     marker.bindPopup(pop);
-    marker.on("click", ()=> marker.openPopup());
+    marker.on("click", ()=>marker.openPopup());
   });
 
   if(bounds.length===1){
-    _map.setView(bounds[0], 8);
+    _map.setView(bounds[0], 10);
   } else if(bounds.length>1){
-    _map.fitBounds(L.latLngBounds(bounds), {padding:[30,30], maxZoom:5});
+    _map.fitBounds(L.latLngBounds(bounds),{padding:[30,30],maxZoom:6});
   }
 }
 
