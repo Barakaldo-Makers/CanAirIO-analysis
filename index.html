@@ -595,29 +595,26 @@ function renderMap(s){
     if(wdir!=null && info.wind_kmh!=null){
       const speed = Math.min(info.wind_kmh, 60);
       const dur = Math.max(1.0, 3.5 - speed/22).toFixed(2);
-      const nPart = 3;
-      // color azul viento, más visible que el color de estado
       const wcol = "#1a7fa8";
-      let rows = "";
-      for(let i=0;i<nPart;i++){
-        const delay = (-(i/nPart)*dur).toFixed(2);
-        const offset = ((i-(nPart-1)/2)*11).toFixed(1);
-        rows += `<div style="
-          position:absolute;left:0;right:0;
-          top:calc(50% + ${offset}px);
-          animation:windflow ${dur}s linear ${delay}s infinite;
+      // Convención meteorológica: wind_dir_deg = dirección DE LA QUE VIENE.
+      // El flujo debe ir hacia (wdir + 180). Con rotate(0) las flechas van
+      // hacia el Este (90°), así que la rotación necesaria es wdir + 90.
+      const flowRot = (wdir + 90) % 360;
+      const rows = `<div style="
+          position:absolute;left:0;right:0;top:50%;
+          margin-top:-.7rem;
+          animation:windflow ${dur}s linear infinite;
           color:${wcol};
           font:700 1.35rem/1 'Space Grotesk',sans-serif;
           text-shadow:0 0 5px #fff,0 0 5px #fff,0 0 8px #fff;
           text-align:center;opacity:0;
           letter-spacing:-3px">››</div>`;
-      }
       const sz = 76;
       const flowIcon = L.divIcon({
         className:"",
         html:`<div style="
           position:relative;width:${sz}px;height:${sz}px;
-          transform:rotate(${wdir}deg)">${rows}</div>`,
+          transform:rotate(${flowRot}deg)">${rows}</div>`,
         iconSize:[sz,sz], iconAnchor:[sz/2,sz/2]
       });
       L.marker([se.lat,se.lon],{icon:flowIcon,interactive:false,zIndexOffset:5}).addTo(_map);
