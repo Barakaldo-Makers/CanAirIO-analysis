@@ -142,11 +142,10 @@
     font:inherit;font-size:.8rem;cursor:pointer;width:100%;text-align:center}
   .map-popup-btn:hover{opacity:.85}
   @keyframes windflow{
-    0%  {opacity:0;  margin-left:-14px}
-    15% {opacity:.0}
-    40% {opacity:.85}
-    85% {opacity:.85}
-    100%{opacity:0;  margin-left:14px}
+    0%  {opacity:0;   margin-left:-26px}
+    25% {opacity:1}
+    75% {opacity:1}
+    100%{opacity:0;   margin-left:26px}
   }
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -595,23 +594,25 @@ function renderMap(s){
 
     if(wdir!=null && info.wind_kmh!=null){
       const speed = Math.min(info.wind_kmh, 60);
-      const dur = Math.max(0.8, 3.5 - speed/25).toFixed(2);
-      const nPart = 5;
-      // contenedor rotado según la dirección del viento
-      // partículas se mueven de izquierda a derecha (= en dirección del viento)
+      const dur = Math.max(1.0, 3.5 - speed/22).toFixed(2);
+      const nPart = 3;
+      // color azul viento, más visible que el color de estado
+      const wcol = "#1a7fa8";
       let rows = "";
       for(let i=0;i<nPart;i++){
         const delay = (-(i/nPart)*dur).toFixed(2);
-        const offset = ((i-(nPart-1)/2)*5).toFixed(1); // filas perpendiculares
+        const offset = ((i-(nPart-1)/2)*11).toFixed(1);
         rows += `<div style="
           position:absolute;left:0;right:0;
           top:calc(50% + ${offset}px);
           animation:windflow ${dur}s linear ${delay}s infinite;
-          color:${col};font-size:.9rem;
-          text-shadow:0 0 3px #fff,0 0 3px #fff;
-          text-align:center;opacity:0">›</div>`;
+          color:${wcol};
+          font:700 1.35rem/1 'Space Grotesk',sans-serif;
+          text-shadow:0 0 5px #fff,0 0 5px #fff,0 0 8px #fff;
+          text-align:center;opacity:0;
+          letter-spacing:-3px">››</div>`;
       }
-      const sz = 44;
+      const sz = 76;
       const flowIcon = L.divIcon({
         className:"",
         html:`<div style="
