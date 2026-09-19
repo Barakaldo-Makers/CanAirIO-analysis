@@ -76,6 +76,11 @@
   .salert{margin-top:8px;font-size:.78rem;color:var(--crit)}
   .snote{margin-top:6px;font-size:.78rem;color:var(--muted);line-height:1.4}
   .sqnote{margin-top:6px;font-size:.74rem;color:var(--warn);font-style:italic}
+  /* base de la corrección aplicada: se lee en segundo plano, sin competir
+     con la cifra corregida */
+  .cbasis{display:block;font-size:.70rem;opacity:.75;margin-top:1px}
+  /* fuente de referencia de la zona */
+  .refsrc{margin-top:8px;font-size:.76rem}
   .ep-alert{margin-top:6px;font-size:.78rem;color:#c00;background:#ffeaea;
     padding:4px 8px;border-radius:6px;border-left:3px solid #c00}
   .caqi-badge{display:inline-block;margin-top:8px}
@@ -340,11 +345,27 @@ function renderState(s){
         return `<div class="caqi-badge" style="background:${pm.color}20;border-left:3px solid ${pm.color};padding:4px 8px;border-radius:6px;font-size:.78rem;margin-top:6px">
           CAQI <b style="color:${pm.color}">${pm.label}</b> · PM2.5 media ${pm.value} µg/m³</div>`;
       })()}
+      ${(()=>{
+        // Contra qué se ha validado esta zona. La leyenda decía siempre
+        // "vs CAMS" y eso ya es falso: la mayoría se valida contra cabinas
+        // oficiales reales (red vasca u OpenAQ), que es mejor referencia.
+        const FUENTE = {
+          euskadi: {ico:"🏛️", txt:"red oficial vasca"},
+          openaq:  {ico:"🏛️", txt:"estaciones oficiales (OpenAQ)"},
+          cams:    {ico:"🛰️", txt:"modelo CAMS·Copernicus"}
+        };
+        const f = FUENTE[z.ref_source] || FUENTE.cams;
+        const est = (z.ref_stations||"").trim();
+        return `<div class="note refsrc">${f.ico} Validado contra ${f.txt}`
+          + (est?`: <b>${est}</b>`:"")
+          + (z.ref_source==="cams"?` <span style="color:var(--muted)">(sin cabina a menos de 25 km)</span>`:"")
+          + `</div>`;
+      })()}
       ${hasConf?`<div class="conflegend">
         <span><span class="conf fiable"></span>fiable</span>
         <span><span class="conf dudoso"></span>dudoso</span>
         <span><span class="conf no_fiable"></span>no fiable</span>
-        <span style="margin-left:auto">vs CAMS·Copernicus</span></div>`:""}
+        <span style="margin-left:auto">mejor referencia disponible</span></div>`:""}
       ${sensorsHtml}
     </div>`;
   }).join("");
@@ -389,10 +410,31 @@ function renderSensorBlock(se){
     ${se.prediction?`<div class="snote">${se.prediction}</div>`:""}
     ${se.data_quality_note?`<div class="sqnote">${se.data_quality_note}</div>`:""}
     ${(()=>{
+      // UNA sola corrección por métrica. La jerarquía la decide el análisis:
+      // cabina oficial > fórmula de humedad > ninguna. Antes se mostraba la de
+      // humedad aunque contradijera a la cabina (x1,23 frente a ÷1,58).
       const pc = se.pm_corrections || {};
-      const m25 = pc.pm25 || {};
-      if(!m25.malm_corrected_last) return "";
-      return `<div class="snote">💧 PM2.5 corregido por humedad (${m25.malm_rh}% HR): <b>${m25.malm_corrected_last} µg/m³</b> (crudo: ${m25.raw_last||"—"})</div>`;
+      const LBL = {pm25:"PM2.5", pm10:"PM10"};
+      const out = [];
+      for(const k of ["pm25","pm10"]){
+        const c = pc[k]; if(!c || c.applied_value==null) continue;
+        const ico = c.applied==="factor_referencia" ? "🎯" : "💧";
+        out.push(`<div class="snote">${ico} ${LBL[k]} corregido: <b>${c.applied_value} µg/m³</b>`
+          + (c.raw_last!=null?` (crudo ${c.raw_last})`:"")
+          + `<span class="cbasis">${c.applied_note||""}</span></div>`);
+        if(c.malm_consistent===false && c.malm_conflict_note)
+          out.push(`<div class="sqnote">💧 ${c.malm_conflict_note}</div>`);
+      }
+      return out.join("");
+    })()}
+    ${(()=>{
+      // Métricas que el nodo envía pero que no se pueden analizar. Antes
+      // desaparecían sin explicación.
+      const dm = se.discarded_metrics || {};
+      const LBL = {nh3:"NH₃", no2:"NO₂", o3:"O₃", co:"CO", pm25:"PM2.5", pm10:"PM10", db:"Ruido"};
+      return Object.entries(dm).map(([k,d])=>
+        `<div class="sqnote">🚫 ${LBL[k]||k.toUpperCase()} sin usar: ${d.note||d.reason||""}</div>`
+      ).join("");
     })()}
     ${(()=>{const d=Object.entries(se.peer_check||{}).filter(([k,v])=>v==="divergente").map(([k])=>k.toUpperCase());
       return d.length?`<div class="salert">⚠ Diverge del consenso local: ${d.join(", ")}</div>`:"";})()}
