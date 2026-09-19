@@ -101,8 +101,18 @@
     background:rgba(0,0,0,.05);padding:1px 7px;border-radius:5px}
   .senstable th .u{display:block;font-weight:400;font-size:.66rem;color:var(--muted);
     font-family:"JetBrains Mono",monospace;margin-top:1px}
-  .senstable td.outrange{color:var(--crit);font-weight:600;
-    background:var(--crit-bg)}
+  /* Fuera de rango físico = sensor averiado, NO aire malo. Antes se pintaba
+     con el rojo de "crítico", que en una tabla de calidad del aire se lee
+     como contaminación alta: justo lo contrario de lo que significa.
+     Ahora: gris tachado, para que se lea como "dato inválido". */
+  .senstable td.outrange{color:var(--muted);font-weight:500;
+    background:repeating-linear-gradient(-45deg,transparent,transparent 5px,
+      rgba(128,128,128,.10) 5px,rgba(128,128,128,.10) 10px);
+    text-decoration:line-through;text-decoration-thickness:1px}
+  .senstable td.outrange .oor{text-decoration:none;display:inline-block;
+    margin-left:4px;font-size:.78em;opacity:.9}
+  .tablegend{font-size:.74rem;color:var(--muted);margin-top:8px;line-height:1.5}
+  .tablegend b{color:var(--ink)}
   .aqi{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:2rem;line-height:1}
   .note{font-size:.85rem;color:var(--muted);margin-top:10px}
   .alerts{margin-top:8px;font-size:.85rem;color:var(--crit)}
@@ -221,6 +231,12 @@
         <tbody id="sensBody"><tr><td colspan="10" class="empty">Cargando sensores…</td></tr></tbody>
       </table>
     </div>
+      <p class="tablegend">
+        <b>—</b> el nodo no lleva ese sensor &nbsp;·&nbsp;
+        <b>🚫</b> lectura fuera del rango físico: sensor averiado o
+        descalibrado, el dato se excluye del análisis
+        <em>(no significa contaminación alta)</em>
+      </p>
   </section>
 
   <footer>
@@ -234,6 +250,8 @@ const ST = {ok:"ok", warning:"atención", critical:"crítico"};
 const COL = {ok:"#2e8b57", warning:"#c98a12", critical:"#c0392b"};
 let HISTORY = null, ACTIVE = null, charts = {}, STATE = null;
 let SENSORS = [], SENS_SORT = {k:"geo3", dir:1};
+// rangos fisicos validos por metrica, exportados por el backend
+let RANGES = {};
 
 function fmtTime(iso){
   try{ return new Date(iso).toLocaleString("es-ES",{day:"2-digit",month:"short",
@@ -270,6 +288,7 @@ async function load(){
     const sn = await fetch("data/sensors.json",{cache:"no-store"}).then(r=>{
       if(!r.ok) throw new Error("HTTP "+r.status); return r.json();});
     SENSORS = sn.sensors||[];
+    RANGES = sn.ranges||{};
     renderSensors();
     if(window.L && STATE) renderMap(STATE);
   }catch(e){
@@ -529,7 +548,17 @@ function renderSensors(){
     const v = s[k];
     if(v==null) return '<td class="num">—</td>';
     const out = s.flags && s.flags[k];
-    return `<td class="num${out?' outrange':''}"${out?' title="fuera de rango físico"':''}>${v}${out?' ⚠':''}</td>`;
+    if(!out) return `<td class="num">${v}</td>`;
+    // Los rangos vienen del backend (METRICS en app.py), no escritos a mano,
+    // para que la explicación no pueda desfasarse del código.
+    const r = (RANGES||{})[k];
+    const det = r
+      ? `${v > r[1] ? "por encima" : "por debajo"} del rango físico válido (${r[0]}–${r[1]})`
+      : "fuera del rango físico válido";
+    const t = `Sensor averiado: lee ${v}, ${det}. `
+            + `El dato NO entra en el análisis. No indica contaminación alta.`;
+    return `<td class="num outrange" title="${t}">${v}`
+         + `<span class="oor" aria-label="${t}">🚫</span></td>`;
   };
   document.getElementById("sensBody").innerHTML = rows.length ? rows.map(s=>`
     <tr>
