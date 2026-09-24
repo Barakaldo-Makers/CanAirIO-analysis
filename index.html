@@ -86,11 +86,11 @@
   .caqi-badge{display:inline-block;margin-top:8px}
   .sensbar{display:flex;align-items:center;gap:12px;margin-bottom:12px}
   #sensSearch{flex:1;max-width:340px;padding:8px 12px;border:1px solid var(--line);
-    border-radius:8px;font:inherit;background:var(--card);color:var(--ink)}
+    border-radius:8px;font:inherit;background:var(--panel);color:var(--ink)}
   .senscount{font-size:.78rem;color:var(--muted)}
   .senswrap{max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:10px}
   .senstable{width:100%;border-collapse:collapse;font-size:.85rem}
-  .senstable th{position:sticky;top:0;background:var(--card);text-align:left;
+  .senstable th{position:sticky;top:0;background:var(--panel);text-align:left;
     padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer;
     font-weight:600;white-space:nowrap;user-select:none}
   .senstable th:hover{color:var(--accent)}
@@ -113,6 +113,31 @@
     margin-left:4px;font-size:.78em;opacity:.9}
   .tablegend{font-size:.74rem;color:var(--muted);margin-top:8px;line-height:1.5}
   .tablegend b{color:var(--ink)}
+  /* explicación de rho y sesgo: plegada por defecto, para quien la necesite */
+  .explica{margin-top:16px;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+  .explica>summary{cursor:pointer;user-select:none;padding:14px 18px;
+    font-size:.88rem;font-weight:500;color:var(--accent)}
+  .explica>summary:hover{background:rgba(13,110,140,.04)}
+  .explica-body{padding:0 18px 18px;font-size:.85rem;color:var(--ink);
+    max-width:64ch}
+  .explica-body p{margin:0 0 10px}
+  .explica-body h4{margin:16px 0 6px;font-size:.82rem;color:var(--accent)}
+  .explica-body ul{margin:0 0 10px;padding-left:18px}
+  .explica-body li{margin-bottom:3px}
+  .ex2{display:grid;gap:0 28px;grid-template-columns:1fr 1fr;
+    border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+    padding:4px 0 10px;margin:14px 0}
+  @media(max-width:640px){.ex2{grid-template-columns:1fr}}
+  .ex2 h4{margin-top:12px}
+  .ex-clave{background:rgba(13,110,140,.06);border-left:3px solid var(--accent);
+    padding:10px 12px;border-radius:0 8px 8px 0}
+  .ex-nota{color:var(--muted);font-size:.8rem}
+  .ex-tabla{border-collapse:collapse;margin:0 0 10px;width:100%}
+  .ex-tabla td,.ex-tabla th{padding:5px 10px 5px 0;vertical-align:top;
+    border-bottom:1px solid var(--line);text-align:left}
+  .ex-tabla th{font-size:.75rem;color:var(--muted);font-weight:500}
+  .ex-tabla tr:last-child td{border-bottom:none}
   .aqi{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:2rem;line-height:1}
   .note{font-size:.85rem;color:var(--muted);margin-top:10px}
   .alerts{margin-top:8px;font-size:.85rem;color:var(--crit)}
@@ -184,6 +209,88 @@
   <section>
     <p class="eyebrow">Estado actual por zona</p>
     <div class="zones" id="zones"><div class="empty">Cargando datos…</div></div>
+
+    <details class="explica">
+      <summary>¿Qué significan «fiable», el rho y el sesgo?</summary>
+      <div class="explica-body">
+        <p>Cada métrica se compara con una estación oficial de referencia, y de
+        esa comparación salen <b>dos números que miden cosas distintas</b>.</p>
+
+        <div class="ex2">
+          <div>
+            <h4>Rho — ¿se mueve igual?</h4>
+            <p>Va de <b>−1 a +1</b> y mira solo la <b>forma</b> de la curva, no
+            los valores.</p>
+            <ul>
+              <li><b>+1</b> · cuando la cabina sube, el sensor sube; cuando
+                  baja, baja</li>
+              <li><b>0</b> · no hay relación, el sensor va a su aire</li>
+              <li><b>−1</b> · hace justo lo contrario</li>
+            </ul>
+            <p>Da igual si lee 5 o 500. Solo importa si acompaña.</p>
+          </div>
+          <div>
+            <h4>Sesgo — ¿acierta el valor?</h4>
+            <p>La diferencia media respecto a la cabina, en porcentaje.</p>
+            <ul>
+              <li><b>−19 %</b> · lee de media un 19 % por debajo de lo real</li>
+              <li><b>+585 %</b> · lee casi siete veces más de lo que hay</li>
+              <li><b>0 %</b> · clava el valor</li>
+            </ul>
+          </div>
+        </div>
+
+        <p class="ex-clave">Piensa en un reloj: <b>el rho es si funciona a la
+        velocidad correcta; el sesgo es si marca la hora correcta.</b> Un reloj
+        siempre 10 minutos atrasado no está roto, está descolocado, y se
+        arregla moviendo las agujas una vez — eso es el factor de corrección.
+        Uno que unas veces adelanta y otras atrasa puede dar la hora correcta
+        de media y no servir para nada.</p>
+
+        <p><b>Por eso manda el rho:</b> el sesgo se corrige con una
+        multiplicación, el rho no se corrige con nada.</p>
+
+        <h4>Las etiquetas</h4>
+        <table class="ex-tabla">
+          <tr>
+            <td><span class="conf fiable"></span> <b>fiable</b></td>
+            <td>rho ≥ 0,6 y sesgo dentro de ±50 %</td>
+          </tr>
+          <tr>
+            <td><span class="conf dudoso"></span> <b>dudoso</b></td>
+            <td>Sirve para tendencias y alertas, pero el valor absoluto
+                necesita la corrección antes de darlo por bueno</td>
+          </tr>
+          <tr>
+            <td><span class="conf no_fiable"></span> <b>no fiable</b></td>
+            <td>rho &lt; 0,3, rho negativo, o sesgo &gt; 300 %. Se excluye de
+                las alertas y los episodios</td>
+          </tr>
+        </table>
+
+        <h4>A qué aspirar</h4>
+        <table class="ex-tabla">
+          <tr><th></th><th>rho</th><th>sesgo</th></tr>
+          <tr><td><b>PM2.5 · PM10</b></td><td>&gt; 0,7 bien · &gt; 0,8 muy bien</td>
+              <td>±30 %</td></tr>
+          <tr><td><b>Gases</b> (NO₂, O₃, NH₃)</td><td>&gt; 0,5 ya es aceptable</td>
+              <td>±50 %</td></tr>
+        </table>
+        <p>Los sensores ópticos de partículas dan bastante mejor resultado que
+        los electroquímicos de gases: no esperes de un NO₂ las cifras de un
+        PM2.5.</p>
+
+        <p class="ex-nota"><b>Un rho negativo es la señal más reveladora.</b>
+        Significa que el sensor se mueve al revés que la realidad, y eso no es
+        medir mal: es estar midiendo <em>otra cosa</em>. En los sensores de gas
+        suele ser la temperatura.</p>
+
+        <p class="ex-nota">Junto a cada comparación aparece la <b>n</b>: cuántas
+        horas se han podido comparar. Con n=12 un rho alto puede ser
+        casualidad; con n=45 ya significa algo. Por debajo de 12 pares la
+        métrica se descarta, porque el número engañaría más de lo que informa.</p>
+      </div>
+    </details>
   </section>
 
   <section>
@@ -306,7 +413,11 @@ function renderState(s){
   host.innerHTML = s.zones.map(z=>{
     const st = z.status in ST ? z.status : "ok";
     const m = (k,u)=> (z[k]==null?"—":(Math.round(z[k]*10)/10)+(u||""));
-    const cf = (k)=>{ const c=(z.confidence||{})[k]; return c?`<span class="conf ${c}" title="fiabilidad vs CAMS: ${c}"></span>`:""; };
+    // El tooltip decía siempre "vs CAMS", y eso dejó de ser cierto: la zona
+    // indica su propia referencia en la línea de abajo. La explicación de qué
+    // significa la etiqueta está en el desplegable bajo las tarjetas.
+    const cf = (k)=>{ const c=(z.confidence||{})[k];
+      return c?`<span class="conf ${c}" title="Fiabilidad frente a la referencia de esta zona: ${c}"></span>`:""; };
     const hasConf = z.confidence && Object.values(z.confidence).some(v=>v);
     const sensors = z.sensors || [];
     const sensorsHtml = sensors.length ? `
