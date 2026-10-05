@@ -113,6 +113,47 @@
     margin-left:4px;font-size:.78em;opacity:.9}
   .tablegend{font-size:.74rem;color:var(--muted);margin-top:8px;line-height:1.5}
   .tablegend b{color:var(--ink)}
+  /* Valor centinela: 0 en una métrica que no puede ser 0 físicamente
+     significa "sin dato", no "aire perfecto". Se pinta apagado para que
+     no se lea como un valor real. */
+  .sentinel{color:var(--muted);font-weight:400}
+  .sentinel .mark{font-size:.8em;opacity:.85;margin-left:3px}
+  /* Dato viejo: el nodo no ha reportado en la ventana esperada. */
+  .senstable tr.stale td{color:var(--muted);font-style:italic}
+  .stale-tag{font-size:.8em;opacity:.85;margin-left:3px;white-space:nowrap}
+  /* Delta sensor − modelo: sirve para detectar nodos al sol o en caja. */
+  .tdelta{display:block;font-size:.7rem;font-family:"JetBrains Mono",monospace;
+    color:var(--muted);margin-top:1px}
+  .tdelta.warn{color:var(--warn);font-weight:500}
+  /* Tabla de contraste con la referencia oficial */
+  .dqwrap{overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+  .dqtable{width:100%;border-collapse:collapse;font-size:.82rem}
+  .dqtable th{position:sticky;top:0;background:var(--panel);text-align:left;
+    padding:9px 12px;border-bottom:1px solid var(--line);font-weight:600;white-space:nowrap}
+  .dqtable th.num,.dqtable td.num{text-align:right;font-family:"JetBrains Mono",monospace}
+  .dqtable td{padding:8px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .dqtable td.mono{font-family:"JetBrains Mono",monospace}
+  .dqtable .rv{color:var(--ok);font-weight:600}
+  .dqtable .bv{color:var(--crit);font-weight:600}
+  .dqtable .nv{color:var(--muted)}
+  .dlbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+  .dlbar button{font-family:"JetBrains Mono",monospace;font-size:.76rem;
+    border:1px solid var(--line);background:var(--panel);color:var(--muted);
+    padding:5px 11px;border-radius:8px;cursor:pointer}
+  .dlbar button:hover{color:var(--accent);border-color:var(--accent)}
+  .dlbar a{font-family:"JetBrains Mono",monospace;font-size:.76rem;
+    color:var(--muted);text-decoration:none;border-bottom:1px dotted var(--line)}
+  .dlbar a:hover{color:var(--accent)}
+  /* filas de fiabilidad numérica por métrica */
+  .confrows{margin-top:8px;display:flex;flex-direction:column;gap:3px}
+  .confrow{font-size:.74rem;color:var(--muted);display:flex;align-items:center;
+    gap:6px;flex-wrap:wrap}
+  .confrow .ck{font-family:"JetBrains Mono",monospace;color:var(--ink);
+    min-width:44px;display:inline-block}
+  .confdetail{font-family:"JetBrains Mono",monospace;font-size:.72rem}
+  .confdetail .bv{color:var(--crit)}
+  .metric .k .src{display:block;font-size:.6rem;font-weight:400;
+    color:var(--muted);letter-spacing:.02em;text-transform:none}
   /* explicación de rho y sesgo: plegada por defecto, para quien la necesite */
   .explica{margin-top:16px;background:var(--panel);border:1px solid var(--line);
     border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
@@ -332,18 +373,41 @@
           <th data-k="o3" class="num">O₃<span class="u">µg/m³</span></th>
           <th data-k="nh3" class="num">NH₃<span class="u">µg/m³</span></th>
           <th data-k="co" class="num">CO<span class="u">mg/m³</span></th>
+          <th data-k="co2" class="num">CO₂<span class="u">ppm</span></th>
           <th data-k="db" class="num">Ruido<span class="u">dB</span></th>
           <th data-k="last_time">Última lectura</th>
         </tr></thead>
-        <tbody id="sensBody"><tr><td colspan="10" class="empty">Cargando sensores…</td></tr></tbody>
+        <tbody id="sensBody"><tr><td colspan="11" class="empty">Cargando sensores…</td></tr></tbody>
       </table>
     </div>
       <p class="tablegend">
         <b>—</b> el nodo no lleva ese sensor &nbsp;·&nbsp;
         <b>🚫</b> lectura fuera del rango físico: sensor averiado o
         descalibrado, el dato se excluye del análisis
-        <em>(no significa contaminación alta)</em>
+        <em>(no significa contaminación alta)</em> &nbsp;·&nbsp;
+        <b>∅</b> valor centinela: <b>0</b> en una métrica que no puede ser 0
+        físicamente significa <em>sin dato</em>, no aire perfecto
       </p>
+      <div class="dlbar">
+        <button id="dlCsv" type="button">⬇ CSV de la tabla</button>
+        <button id="dlJson" type="button">⬇ sensors.json</button>
+        <a href="data/state.json" download>state.json</a>
+        <a href="data/history.json" download>history.json</a>
+      </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Contraste con la referencia oficial</p>
+    <div id="dq"><div class="empty">Cargando…</div></div>
+    <p class="tablegend">
+      <b>rho</b> · correlación de rangos de Spearman entre el nodo y la
+      referencia: mira solo si la curva se mueve igual, no los valores &nbsp;·&nbsp;
+      <b>sesgo</b> · diferencia media en porcentaje (positivo = el nodo lee
+      de más) &nbsp;·&nbsp;
+      <b>n</b> · horas comparables; por debajo de 12 pares la métrica se
+      descarta. <em>Valores no publicados por el backend se muestran como
+      «—», no como cero.</em>
+    </p>
   </section>
 
   <footer>
@@ -363,6 +427,56 @@ let RANGES = {};
 function fmtTime(iso){
   try{ return new Date(iso).toLocaleString("es-ES",{day:"2-digit",month:"short",
     hour:"2-digit",minute:"2-digit"}); }catch(e){ return iso; }
+}
+
+// ── helpers de presentación ────────────────────────────────────────────────
+// Un 0 en estas métricas es físicamente imposible (o implica ausencia de
+// medida). Se pinta como valor centinela para que no se lea como "aire
+// perfecto" ni como una lectura real.
+const ZERO_IS_SENTINEL = new Set(["pm25","pm10","pm1","no2","o3","nh3","co","db"]);
+
+// Horas tras las cuales un nodo se considera obsoleto y se marca aparte.
+const STALE_H = 2;
+
+function hoursSince(iso){
+  const t = Date.parse(iso);
+  if(isNaN(t)) return null;
+  const ref = STATE && STATE.generated_at ? Date.parse(STATE.generated_at) : Date.now();
+  if(isNaN(ref)) return null;
+  return (ref - t)/3.6e6;
+}
+
+// n se muestra solo si el backend lo publica. No se inventa.
+const fmtN = (n)=> (n==null ? "—" : n);
+
+// rho con 2 decimales y signo explícito; null -> "—"
+function fmtRho(r){
+  if(r==null || isNaN(r)) return "—";
+  const v = Number(r);
+  return (v>=0?"+":"−") + Math.abs(v).toFixed(2);
+}
+// sesgo en % con signo; null -> "—"
+function fmtBias(b){
+  if(b==null || isNaN(b)) return "—";
+  const v = Number(b);
+  return (v>=0?"+":"−") + Math.abs(v).toFixed(0) + " %";
+}
+// factor de corrección -> sesgo implícito en %
+function factorToBias(f){
+  if(f==null || isNaN(f) || Number(f)===0) return null;
+  return (1/Number(f) - 1) * 100;
+}
+// clasifica un sesgo según las etiquetas publicadas en la web
+function biasClass(b){
+  if(b==null) return "nv";
+  return Math.abs(b) > 300 ? "bv" : "nv";
+}
+// fila de fiabilidad con rho/sesgo/n, tolerante a que el backend aún no
+// publique los campos numéricos (issue: "mostrar rho, sesgo y n").
+function confRow(c){
+  if(!c) return "";
+  const rho = fmtRho(c.rho), bias = fmtBias(c.bias_pct), n = fmtN(c.n);
+  return `<span class="confdetail">rho ${rho} · sesgo ${bias} · n ${n}</span>`;
 }
 
 async function load(){
@@ -397,10 +511,11 @@ async function load(){
     SENSORS = sn.sensors||[];
     RANGES = sn.ranges||{};
     renderSensors();
+    renderDataQuality(STATE);
     if(window.L && STATE) renderMap(STATE);
   }catch(e){
     document.getElementById("sensBody").innerHTML =
-      '<tr><td colspan="10" class="empty">Listado de sensores aún no disponible.</td></tr>';
+      '<tr><td colspan="11" class="empty">Listado de sensores aún no disponible.</td></tr>';
   }
 }
 
@@ -418,26 +533,63 @@ function renderState(s){
     // significa la etiqueta está en el desplegable bajo las tarjetas.
     const cf = (k)=>{ const c=(z.confidence||{})[k];
       return c?`<span class="conf ${c}" title="Fiabilidad frente a la referencia de esta zona: ${c}"></span>`:""; };
+    // Fiabilidad numérica. El backend publica la etiqueta en `confidence` y
+    // los factores de corrección en dos sitios distintos: `pm25_corr_factor`
+    // a nivel de zona y `sensors[].pm_corrections[k].factor` a nivel de nodo.
+    // Se usa el de zona si existe y, si no, la mediana de los nodos.
+    // rho y n solo se muestran si el backend llega a publicarlos (issues #4 y #5).
+    // No se inventa ningún número: lo que falta sale como "—".
+    const factorFor = (k)=>{
+      if(k==="pm25" && z.pm25_corr_factor!=null) return z.pm25_corr_factor;
+      const fs = (z.sensors||[])
+        .map(se=>(se.pm_corrections||{})[k])
+        .filter(c=>c && c.factor!=null)
+        .map(c=>c.factor)
+        .sort((a,b)=>a-b);
+      if(!fs.length) return null;
+      const mid = Math.floor(fs.length/2);
+      return fs.length%2 ? fs[mid] : (fs[mid-1]+fs[mid])/2;
+    };
+    const confNum = (k)=>{
+      const c = (z.confidence||{})[k];
+      if(!c) return "";
+      const f = factorFor(k);
+      const bias = factorToBias(f);
+      return `<span class="confdetail" title="rho: correlación de rangos con la referencia · sesgo: diferencia media en % · n: horas comparables">`
+        + `rho <b>${fmtRho(null)}</b> · sesgo <b class="${biasClass(bias)}">${fmtBias(bias)}</b> · n ${fmtN(null)}`
+        + (f!=null?` · factor ×${f}`:"")
+        + `</span>`;
+    };
     const hasConf = z.confidence && Object.values(z.confidence).some(v=>v);
+
+    // AQI: distinguir "sin dato" de un 0 real. Un AQI de 0 con PM2.5 nulo es
+    // el centinela que publica el backend cuando no hay medida; un 0 con
+    // PM2.5 = 0,05 sí es una lectura real de aire limpio.
+    const aqiMissing = (z.aqi==null) || (z.aqi===0 && z.pm25==null);
     const sensors = z.sensors || [];
     const sensorsHtml = sensors.length ? `
       <details class="sensors">
         <summary>${sensors.length} ${sensors.length===1?"sensor":"sensores"} en esta zona · ver detalle</summary>
-        <div class="sensorgrid">${sensors.map(se=>renderSensorBlock(se)).join("")}</div>
+        <div class="sensorgrid">${sensors.map(se=>renderSensorBlock(se, z)).join("")}</div>
       </details>` : "";
     return `<div class="card ${st}">
       <div class="row"><span class="zone">${z.geo3}</span>
         <span class="badge ${st}">${ST[st]||st}</span></div>
       <div class="row" style="margin-top:12px;align-items:flex-end">
         <div><div class="metric"><span class="k">AQI</span>
-          <span class="aqi" style="color:${COL[st]}">${z.aqi??"—"}</span></div></div>
+          <span class="aqi" style="color:${aqiMissing?"var(--muted)":COL[st]}">${aqiMissing?"sin dato":z.aqi}</span></div></div>
         <div class="metrics" style="margin:0;flex:1;margin-left:18px">
           <div class="metric"><span class="k">PM2.5${cf("pm25")}</span><span class="v">${m("pm25"," µg")}</span></div>
           <div class="metric"><span class="k">Ruido</span><span class="v">${m("noise_db"," dB")}</span></div>
           <div class="metric"><span class="k">NO₂${cf("no2")}</span><span class="v">${m("no2"," µg")}</span></div>
-          <div class="metric"><span class="k">Viento</span><span class="v">${m("wind_kmh"," km/h")}${z.wind_dir_txt?` <span style="font-size:.85em;color:var(--muted)">${z.wind_dir_txt}</span>`:""}</span></div>
+          <div class="metric"><span class="k">Viento<span class="src">modelo 10 m</span></span><span class="v">${m("wind_kmh"," km/h")}${z.wind_dir_txt?` <span style="font-size:.85em;color:var(--muted)">${z.wind_dir_txt}</span>`:""}</span></div>
         </div></div>
-      ${z.alerts?`<div class="alerts">⚠ ${z.alerts}</div>`:""}
+        ${(z.confidence&&Object.values(z.confidence).some(v=>v))?`<div class="confrows">
+        ${["pm25","pm10","no2","o3"].filter(k=>(z.confidence||{})[k]).map(k=>
+         `<div class="confrow"><span class="ck">${({pm25:"PM2.5",pm10:"PM10",no2:"NO₂",o3:"O₃"})[k]}</span>`
+         + `<span class="conf ${z.confidence[k]}"></span> ${z.confidence[k]} ${confNum(k)}</div>`).join("")}
+        </div>`:""}
+        ${z.alerts?`<div class="alerts">⚠ ${z.alerts}</div>`:""}
       ${z.prediction?`<div class="note">${z.prediction}</div>`:""}
       ${(()=>{
         const n=z.weather_now||{};
@@ -508,7 +660,7 @@ function renderState(s){
   });
 }
 
-function renderSensorBlock(se){
+function renderSensorBlock(se, z){
   const st = se.status in ST ? se.status : "ok";
   const fmt = (x)=> (x==null?"—":(Math.round(x*10)/10));
   const confDot = (c)=> c?`<span class="conf ${c}" title="${c}"></span>`:"";
@@ -520,11 +672,24 @@ function renderSensorBlock(se){
     const ia = order.indexOf(a), ib = order.indexOf(b);
     return (ia<0?99:ia) - (ib<0?99:ib);
   });
+  // Temperatura de referencia del modelo para esta zona. Sirve para detectar
+  // nodos al sol, en caja o pegados a una fuente de calor: el delta es más
+  // informativo que el valor absoluto.
+  const modelTmp = (z && z.weather_now) ? z.weather_now.temperature_c : null;
   const cells = keys.map(k=>{
     const mt = metrics[k];
     // etiqueta corta: quita la unidad entre paréntesis para el encabezado
     const short = (mt.label||k).replace(/\s*\(.*\)/,"");
-    return `<span class="sm">${short}${confDot(mt.confidence)} <b>${fmt(mt.value)}</b></span>`;
+    let extra = "";
+    if(k==="tmp" && mt.value!=null && modelTmp!=null){
+      const d = mt.value - modelTmp;
+      const warn = Math.abs(d) >= 5;
+      extra = `<span class="tdelta${warn?" warn":""}" title="Diferencia entre el sensor y la temperatura del modelo Open-Meteo en esta zona. Una diferencia grande sugiere sensor al sol, en recinto cerrado o junto a una fuente de calor.">Δ ${d>=0?"+":"−"}${Math.abs(d).toFixed(1)} vs modelo${warn?" ⚠":""}</span>`;
+    }
+    if(k==="co2" && mt.value!=null && mt.value < 400){
+      extra = `<span class="tdelta warn" title="Por debajo del fondo atmosférico (~420 ppm en 2026). Al aire libre este valor es imposible: el sensor NDIR está sin calibrar.">⚠ bajo el fondo (~420)</span>`;
+    }
+    return `<span class="sm">${short}${confDot(mt.confidence)} <b>${fmt(mt.value)}</b>${extra}</span>`;
   }).join("");
   return `<div class="sensor ${st}">
     <div class="srow">
@@ -594,6 +759,9 @@ function drawCharts(){
   if(!ACTIVE) return;
   const pts = seriesFor(ACTIVE);
   const labels = pts.map(p=>fmtTime(p.t));
+  // Un AQI 0 con pm25 null es un centinela, no una medida: se pinta como
+  // hueco para que la línea no baje a cero y sugiera aire perfecto.
+  const aqiData = pts.map(p => (p.pm25==null ? null : p.aqi));
   const baseOpts = {responsive:true,maintainAspectRatio:false,
     interaction:{intersect:false,mode:"index"},
     scales:{x:{ticks:{maxTicksLimit:6,font:{family:"JetBrains Mono",size:10}},grid:{display:false}},
@@ -602,9 +770,9 @@ function drawCharts(){
   // AQI
   charts.aqi && charts.aqi.destroy();
   charts.aqi = new Chart(document.getElementById("aqiChart"),{type:"line",
-    data:{labels,datasets:[{label:"AQI",data:pts.map(p=>p.aqi),
+    data:{labels,datasets:[{label:"AQI",data:aqiData,
       borderColor:"#0d6e8c",backgroundColor:"rgba(13,110,140,.12)",fill:true,
-      tension:.3,pointRadius:0,borderWidth:2}]},options:baseOpts});
+      tension:.3,pointRadius:0,borderWidth:2,spanGaps:false}]},options:baseOpts});
   // PM2.5 + ruido (doble eje)
   const opt2 = JSON.parse(JSON.stringify(baseOpts));
   opt2.scales.y1 = {position:"right",beginAtZero:true,grid:{display:false},
@@ -659,27 +827,45 @@ function renderSensors(){
     const v = s[k];
     if(v==null) return '<td class="num">—</td>';
     const out = s.flags && s.flags[k];
-    if(!out) return `<td class="num">${v}</td>`;
-    // Los rangos vienen del backend (METRICS en app.py), no escritos a mano,
-    // para que la explicación no pueda desfasarse del código.
-    const r = (RANGES||{})[k];
-    const det = r
-      ? `${v > r[1] ? "por encima" : "por debajo"} del rango físico válido (${r[0]}–${r[1]})`
-      : "fuera del rango físico válido";
-    const t = `Sensor averiado: lee ${v}, ${det}. `
-            + `El dato NO entra en el análisis. No indica contaminación alta.`;
-    return `<td class="num outrange" title="${t}">${v}`
-         + `<span class="oor" aria-label="${t}">🚫</span></td>`;
+    if(out){
+      // Los rangos vienen del backend (METRICS en app.py), no escritos a mano,
+      // para que la explicación no pueda desfasarse del código.
+      const r = (RANGES||{})[k];
+      const det = r
+        ? `${v > r[1] ? "por encima" : "por debajo"} del rango físico válido (${r[0]}–${r[1]})`
+        : "fuera del rango físico válido";
+      const t = `Sensor averiado: lee ${v}, ${det}. `
+              + `El dato NO entra en el análisis. No indica contaminación alta.`;
+      return `<td class="num outrange" title="${t}">${v}`
+           + `<span class="oor" aria-label="${t}">🚫</span></td>`;
+    }
+    // Valor centinela: 0 donde físicamente no puede haberlo (o donde 0 dB
+    // no es una medida). Se marca para que no se lea como dato real.
+    if(v===0 && ZERO_IS_SENTINEL.has(k)){
+      const t = `0 en ${k.toUpperCase()} es un valor centinela: el nodo no `
+              + `aporta medida real de esta métrica. No significa aire limpio.`;
+      return `<td class="num sentinel" title="${t}">0<span class="mark">∅</span></td>`;
+    }
+    return `<td class="num">${v}</td>`;
+  };
+  const staleRow = (s)=>{
+    const h = hoursSince(s.last_time);
+    return h!=null && h > STALE_H;
   };
   document.getElementById("sensBody").innerHTML = rows.length ? rows.map(s=>`
-    <tr>
+    <tr${staleRow(s)?' class="stale"':''}>
       <td>${s.name||"—"}</td>
       <td><span class="zone-pill">${s.geo3||"—"}</span></td>
       ${cell(s,"pm25")}${cell(s,"pm10")}${cell(s,"no2")}${cell(s,"o3")}
-      ${cell(s,"nh3")}${cell(s,"co")}${cell(s,"db")}
-      <td>${s.last_time?fmtTime(s.last_time):"—"}</td>
+      ${cell(s,"nh3")}${cell(s,"co")}${cell(s,"co2")}${cell(s,"db")}
+      <td>${s.last_time?fmtTime(s.last_time):"—"}${(()=>{
+        const h = hoursSince(s.last_time);
+        if(h==null) return "";
+        if(h <= STALE_H) return "";
+        return `<span class="stale-tag" title="El nodo no reporta desde hace ${h.toFixed(1)} h; sus valores no deberían contar en las medias de zona">⏳ ${h<24?h.toFixed(0)+" h":(h/24).toFixed(1)+" d"}</span>`;
+      })()}</td>
     </tr>`).join("") :
-    '<tr><td colspan="10" class="empty">Sin coincidencias.</td></tr>';
+    '<tr><td colspan="11" class="empty">Sin coincidencias.</td></tr>';
 }
 
 // búsqueda y ordenación
@@ -691,6 +877,112 @@ document.querySelectorAll(".senstable th").forEach(th=>{
     SENS_SORT.k = k;
     renderSensors();
   });
+});
+
+// ── CONTRASTE CON LA REFERENCIA OFICIAL ─────────────────────────────────────
+// Tabla de fiabilidad por zona y métrica. Los números salen del backend:
+// - rho y n: solo si llegan publicados (issues #4 y #5).
+// - sesgo: del factor de corrección si no hay sesgo explícito.
+// Lo que no llega se muestra como "—", nunca como 0.
+function renderDataQuality(s){
+  const host = document.getElementById("dq");
+  if(!host) return;
+  if(!s || !s.zones || !s.zones.length){
+    host.innerHTML = '<div class="empty">Sin datos de contraste todavía.</div>'; return;
+  }
+  const M = {pm25:"PM2.5", pm10:"PM10", no2:"NO₂", o3:"O₃", nh3:"NH₃", co:"CO", db:"Ruido"};
+  const FUENTE = {euskadi:"red oficial vasca", openaq:"estaciones oficiales (OpenAQ)",
+                  cams:"modelo CAMS·Copernicus"};
+  const rows = [];
+  for(const z of s.zones){
+    const conf = z.confidence || {};
+    for(const k of ["pm25","pm10","no2","o3"]){
+      const c = conf[k];
+      if(!c) continue;
+      // Mismo criterio que en la tarjeta: factor de zona si existe, si no la
+      // mediana de los factores de los nodos. El sesgo se deduce del factor.
+      let f = null;
+      if(k==="pm25" && z.pm25_corr_factor!=null) f = z.pm25_corr_factor;
+      if(f==null){
+        const fs = (z.sensors||[])
+          .map(se=>(se.pm_corrections||{})[k])
+          .filter(x=>x && x.factor!=null).map(x=>x.factor).sort((a,b)=>a-b);
+        if(fs.length){
+          const mid = Math.floor(fs.length/2);
+          f = fs.length%2 ? fs[mid] : (fs[mid-1]+fs[mid])/2;
+        }
+      }
+      const bias = factorToBias(f);
+      const nSens = (z.sensors||[]).filter(se=>{
+        const m=(se.metrics||{})[k]; return m && m.value!=null;
+      }).length;
+      rows.push({z:z.geo3, k, c, rho:null, bias, n:null, nSens,
+                 ref:z.ref_source, refSt:z.ref_stations, factor:f});
+    }
+  }
+  if(!rows.length){ host.innerHTML='<div class="empty">Ninguna zona tiene fiabilidad calculada todavía.</div>'; return; }
+  const cLabel = {fiable:"fiable", dudoso:"dudoso", no_fiable:"no fiable"};
+  host.innerHTML = `<div class="dqwrap"><table class="dqtable">
+    <thead><tr>
+      <th>Zona</th><th>Métrica</th><th>Referencia</th><th>Etiqueta</th>
+      <th class="num">rho</th><th class="num">sesgo</th><th class="num">n</th>
+      <th class="num">factor</th><th class="num">nodos</th>
+    </tr></thead><tbody>
+    ${rows.map(r=>`<tr>
+      <td class="mono">${r.z}</td>
+      <td>${M[r.k]||r.k.toUpperCase()}</td>
+      <td>${FUENTE[r.ref]||r.ref||"—"}${r.refSt?` <span class="nv" title="${r.refSt}">· ${r.refSt.split(",").length} est.</span>`:""}</td>
+      <td><span class="conf ${r.c}"></span> ${cLabel[r.c]||r.c}</td>
+      <td class="num">${fmtRho(r.rho)}</td>
+      <td class="num ${biasClass(r.bias)}">${fmtBias(r.bias)}</td>
+      <td class="num">${fmtN(r.n)}</td>
+      <td class="num">${r.factor!=null?r.factor:"—"}</td>
+      <td class="num">${r.nSens}</td>
+    </tr>`).join("")}
+    </tbody></table></div>
+    <p class="tablegend">
+      El <b>sesgo</b> se deduce del factor de corrección cuando el backend no
+      publica un sesgo explícito: <span class="mono">sesgo = 1/factor − 1</span>.
+      Un factor de 18,35 equivale a +1735 %.
+      <em>rho y n aparecen como «—» hasta que el backend los publique</em>
+      (issues #4 y #5).
+    </p>`;
+}
+
+// ── EXPORTACIÓN ─────────────────────────────────────────────────────────────
+function csvEscape(v){
+  if(v==null) return "";
+  const s = String(v);
+  return /[",\n;]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+function downloadBlob(name, text, mime){
+  const b = new Blob([text], {type: mime||"text/csv;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(b); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
+}
+function sensorsToCsv(){
+  const cols = ["name","mac","geo3","lat","lon","pm25","pm10","no2","o3",
+                "nh3","co","co2","db","last_time"];
+  const head = cols.join(",");
+  const body = (SENSORS||[]).map(s=>cols.map(c=>csvEscape(s[c])).join(",")).join("\n");
+  return head + "\n" + body + "\n";
+}
+function zoneHistoryToCsv(zone){
+  const pts = seriesFor(zone);
+  const cols = ["t","geo3","aqi","pm25","noise_db","status"];
+  const head = cols.join(",");
+  const body = pts.map(p=>cols.map(c=>csvEscape(p[c])).join(",")).join("\n");
+  return head + "\n" + body + "\n";
+}
+document.getElementById("dlCsv").addEventListener("click", ()=>{
+  const name = `canairio_${ACTIVE||"zonas"}_${new Date().toISOString().slice(0,10)}.csv`;
+  downloadBlob(name, zoneHistoryToCsv(ACTIVE));
+});
+document.getElementById("dlJson").addEventListener("click", ()=>{
+  downloadBlob("sensors.json", JSON.stringify({generated_at:new Date().toISOString(),
+    count:(SENSORS||[]).length, ranges:RANGES, sensors:SENSORS}, null, 1), "application/json");
 });
 
 // ── MAPA LEAFLET ────────────────────────────────────────────────────────────
