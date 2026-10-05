@@ -388,6 +388,13 @@
         <b>∅</b> valor centinela: <b>0</b> en una métrica que no puede ser 0
         físicamente significa <em>sin dato</em>, no aire perfecto
       </p>
+      <p class="tablegend">
+        ⚠ Esta tabla sale de <b>sensors.json</b>, que publica los PM
+        <b>redondeados a entero</b> y sin campo PM1, mientras las tarjetas de
+        zona salen de <b>state.json</b>, con decimales. El mismo nodo puede
+        mostrar números distintos en los dos sitios (issue #16). La columna
+        PM10 de los nodos SPS30 tiene ±25 µg/m³ de precisión especificada.
+      </p>
       <div class="dlbar">
         <button id="dlCsv" type="button">⬇ CSV de la tabla</button>
         <button id="dlJson" type="button">⬇ sensors.json</button>
@@ -894,6 +901,17 @@ function renderDataQuality(s){
   const FUENTE = {euskadi:"red oficial vasca", openaq:"estaciones oficiales (OpenAQ)",
                   cams:"modelo CAMS·Copernicus"};
   const rows = [];
+  // RMSE del ajuste de corrección, mediana de los nodos de la zona. Un RMSE
+  // mayor que el propio valor medido significa que la corrección no explica
+  // nada a ese nivel de concentración: el canal no es utilizable.
+  const rmseOf = (z, k, key)=>{
+    const arr = (z.sensors||[])
+      .map(se=>(((se.pm_corrections||{})[k]||{}).rh_model||{})[key])
+      .filter(v=>v!=null).sort((a,b)=>a-b);
+    if(!arr.length) return null;
+    const m = Math.floor(arr.length/2);
+    return arr.length%2 ? arr[m] : (arr[m-1]+arr[m])/2;
+  };
   for(const z of s.zones){
     const conf = z.confidence || {};
     for(const k of ["pm25","pm10","no2","o3"]){
@@ -917,7 +935,10 @@ function renderDataQuality(s){
         const m=(se.metrics||{})[k]; return m && m.value!=null;
       }).length;
       rows.push({z:z.geo3, k, c, rho:null, bias, n:null, nSens,
-                 ref:z.ref_source, refSt:z.ref_stations, factor:f});
+                 ref:z.ref_source, refSt:z.ref_stations, factor:f,
+                 rmseFactor: rmseOf(z, k, "rmse_factor_model"),
+                 measured: (k==="pm25") ? z.pm25
+                         : (k==="pm10") ? (z.caqi && z.caqi.pm10 && z.caqi.pm10.value) : null});
     }
   }
   if(!rows.length){ host.innerHTML='<div class="empty">Ninguna zona tiene fiabilidad calculada todavía.</div>'; return; }
@@ -926,9 +947,18 @@ function renderDataQuality(s){
     <thead><tr>
       <th>Zona</th><th>Métrica</th><th>Referencia</th><th>Etiqueta</th>
       <th class="num">rho</th><th class="num">sesgo</th><th class="num">n</th>
-      <th class="num">factor</th><th class="num">nodos</th>
+      <th class="num">factor</th>
+      <th class="num" title="Error del ajuste (RMSE) del modelo de corrección, en µg/m³. Si supera al valor medido, la corrección no explica nada.">RMSE</th>
+      <th class="num">nodos</th>
     </tr></thead><tbody>
-    ${rows.map(r=>`<tr>
+    ${rows.map(r=>{
+      const useless = (r.rmseFactor!=null && r.measured!=null && r.measured>0 && r.rmseFactor > r.measured);
+      const rv = r.rmseFactor!=null ? Math.round(r.rmseFactor*100)/100 : null;
+      const rt = rv!=null ? `${rv}${useless?" ⚠":""}` : "—";
+      const rtitle = useless
+        ? `El error del ajuste (${rv} µg/m³) supera al valor medido (${r.measured} µg/m³): a este nivel de concentración la corrección no aporta información.`
+        : (r.rmseFactor!=null?`RMSE del modelo de corrección: ${rv} µg/m³`:"");
+      return `<tr>
       <td class="mono">${r.z}</td>
       <td>${M[r.k]||r.k.toUpperCase()}</td>
       <td>${FUENTE[r.ref]||r.ref||"—"}${r.refSt?` <span class="nv" title="${r.refSt}">· ${r.refSt.split(",").length} est.</span>`:""}</td>
@@ -937,15 +967,32 @@ function renderDataQuality(s){
       <td class="num ${biasClass(r.bias)}">${fmtBias(r.bias)}</td>
       <td class="num">${fmtN(r.n)}</td>
       <td class="num">${r.factor!=null?r.factor:"—"}</td>
+      <td class="num ${useless?"bv":"nv"}" title="${rtitle}">${rt}</td>
       <td class="num">${r.nSens}</td>
-    </tr>`).join("")}
+    </tr>`;}).join("")}
     </tbody></table></div>
     <p class="tablegend">
       El <b>sesgo</b> se deduce del factor de corrección cuando el backend no
       publica un sesgo explícito: <span class="mono">sesgo = 1/factor − 1</span>.
-      Un factor de 18,35 equivale a +1735 %.
+      Un factor de 18,35 equivale a −95 % (el nodo lee 18 veces de más).
       <em>rho y n aparecen como «—» hasta que el backend los publique</em>
       (issues #4 y #5).
+    </p>
+    <p class="tablegend">
+      <b>Sobre PM10.</b> Los nodos con Sensirion SPS30 <em>derivan</em> PM4 y
+      PM10 a partir del perfil de distribución de las partículas medidas; no
+      los miden. Su precisión especificada es <b>±25 µg/m³</b> en el rango
+      0–100, frente a ±[5 µg/m³ + 5 %] de PM1 y PM2.5: <b>cinco veces peor</b>.
+      A concentraciones de fondo urbano (2–8 µg/m³) la barra de error es mayor
+      que el propio valor, así que la columna PM10 de esos nodos no distingue
+      nada por debajo de ~25 µg/m³. El <b>RMSE</b> de la tabla es la
+      comprobación directa: cuando supera al valor medido, la corrección no
+      explica nada.
+    </p>
+    <p class="tablegend">
+      <b>Sobre la resolución.</b> El SPS30 tiene resolución de masa de
+      <b>1 µg/m³</b>. Publicar PM con dos decimales (0,05 µg/m³) muestra una
+      precisión que el sensor no tiene.
     </p>`;
 }
 
