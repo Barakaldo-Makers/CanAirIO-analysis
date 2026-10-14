@@ -134,8 +134,8 @@
   .dqtable td{padding:8px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
   .dqtable td.mono{font-family:"JetBrains Mono",monospace}
   .dqtable .rv{color:var(--ok);font-weight:600}
-  .dqtable .bv{color:var(--crit);font-weight:600}
-  .dqtable .nv{color:var(--muted)}
+  .dqtable .wv{color:var(--warn);font-weight:600}
+  .dqtable .bv{color:var(--crit);font-weight:600}  .dqtable .nv{color:var(--muted)}
   .dlbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
   .dlbar button{font-family:"JetBrains Mono",monospace;font-size:.76rem;
     border:1px solid var(--line);background:var(--panel);color:var(--muted);
@@ -151,8 +151,9 @@
   .confrow .ck{font-family:"JetBrains Mono",monospace;color:var(--ink);
     min-width:44px;display:inline-block}
   .confdetail{font-family:"JetBrains Mono",monospace;font-size:.72rem}
-  .confdetail .bv{color:var(--crit)}
-  .metric .k .src{display:block;font-size:.6rem;font-weight:400;
+  .confdetail .rv{color:var(--ok)}
+  .confdetail .wv{color:var(--warn)}
+  .confdetail .bv{color:var(--crit)}  .metric .k .src{display:block;font-size:.6rem;font-weight:400;
     color:var(--muted);letter-spacing:.02em;text-transform:none}
   /* explicación de rho y sesgo: plegada por defecto, para quien la necesite */
   .explica{margin-top:16px;background:var(--panel);border:1px solid var(--line);
@@ -396,7 +397,8 @@
         PM10 de los nodos SPS30 tiene ±25 µg/m³ de precisión especificada.
       </p>
       <div class="dlbar">
-        <button id="dlCsv" type="button">⬇ CSV de la tabla</button>
+        <button id="dlCsv" type="button">⬇ CSV del histórico de la zona</button>
+        <button id="dlSensors" type="button">⬇ CSV de los sensores</button>
         <button id="dlJson" type="button">⬇ sensors.json</button>
         <a href="data/state.json" download>state.json</a>
         <a href="data/history.json" download>history.json</a>
@@ -473,17 +475,14 @@ function factorToBias(f){
   if(f==null || isNaN(f) || Number(f)===0) return null;
   return (1/Number(f) - 1) * 100;
 }
-// clasifica un sesgo según las etiquetas publicadas en la web
+// Tres categorías según las reglas publicadas en la propia web:
+// fiable = |sesgo| <= 50 %; dudoso = 50–300 %; no fiable = > 300 %.
 function biasClass(b){
   if(b==null) return "nv";
-  return Math.abs(b) > 300 ? "bv" : "nv";
-}
-// fila de fiabilidad con rho/sesgo/n, tolerante a que el backend aún no
-// publique los campos numéricos (issue: "mostrar rho, sesgo y n").
-function confRow(c){
-  if(!c) return "";
-  const rho = fmtRho(c.rho), bias = fmtBias(c.bias_pct), n = fmtN(c.n);
-  return `<span class="confdetail">rho ${rho} · sesgo ${bias} · n ${n}</span>`;
+  const a = Math.abs(b);
+  if(a <= 50) return "rv";
+  if(a <= 300) return "wv";
+  return "bv";
 }
 
 async function load(){
@@ -1026,6 +1025,9 @@ function zoneHistoryToCsv(zone){
 document.getElementById("dlCsv").addEventListener("click", ()=>{
   const name = `canairio_${ACTIVE||"zonas"}_${new Date().toISOString().slice(0,10)}.csv`;
   downloadBlob(name, zoneHistoryToCsv(ACTIVE));
+});
+document.getElementById("dlSensors").addEventListener("click", ()=>{
+  downloadBlob(`canairio_sensores_${new Date().toISOString().slice(0,10)}.csv`, sensorsToCsv());
 });
 document.getElementById("dlJson").addEventListener("click", ()=>{
   downloadBlob("sensors.json", JSON.stringify({generated_at:new Date().toISOString(),
